@@ -1,0 +1,21 @@
+{
+    "name": "simple_contracts",
+    "version": "1.0.0",
+    "private": true,
+    "workspaces": [
+        "packages/frontend",
+        "packages/backend"
+    ],
+    "scripts": {
+        "dev": "concurrently --kill-others-on-fail --names \"backend,frontend\" --prefix-colors \"cyan.bold,green.bold\" \"npm run dev -w packages/backend\" \"npm run dev -w packages/frontend\"",
+        "dev:backend": "npm run dev -w packages/backend",
+        "dev:frontend": "npm run dev -w packages/frontend",
+        "build": "npm run build --workspaces --if-present",
+        "health:backend": "curl -fsS http://localhost:3000/api/health",
+        "health:proxy": "curl -fsS http://localhost:5173/api/health",
+        "health": "npm run health:backend && npm run health:proxy && echo HEALTH_OK"
+    },
+    "devDependencies": {
+        "concurrently": "^9.2.1"
+    }
+}
