@@ -13,14 +13,14 @@ function LoginPage() {
         try {
             await login({ email, password }).unwrap();
             // Handle successful login - redirect to dashboard
-            navigate("/contracts");
+            navigate("/contracts/new");
         } catch (err) {
             console.error("Login failed:", err);
         }
     };
 
     return (
-        <div className="relative flex items-center justify-center min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950 overflow-hidden">
+        <div className="relative flex items-center justify-center min-h-screen bg-linear-to-br from-gray-950 via-gray-900 to-gray-950 overflow-hidden">
             {/* Animated background elements */}
             <div className="absolute inset-0 overflow-hidden pointer-events-none">
                 <div className="absolute -top-40 -right-40 w-80 h-80 bg-indigo-600 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-float-slow"></div>
