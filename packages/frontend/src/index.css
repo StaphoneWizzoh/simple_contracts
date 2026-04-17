@@ -1,39 +1,158 @@
 @import "tailwindcss";
 
+/* ── Tiptap placeholder ───────────────────────────────────────────── */
 .tiptap p.is-editor-empty:first-child::before {
-    color: #9ca3af;
+    color: #6b7280;
     content: attr(data-placeholder);
     float: left;
     height: 0;
     pointer-events: none;
 }
 
-.tiptap > * + * {
-    margin-top: 0.75rem;
-}
-
-.tiptap h1,
-.tiptap h2,
-.tiptap h3 {
-    color: #f3f4f6;
-    font-weight: 700;
-}
-
-.tiptap p,
-.tiptap li {
+/* ── Contract prose styles ────────────────────────────────────────── */
+.contract-prose {
+    font-size: 0.9375rem;
+    line-height: 1.75;
     color: #e5e7eb;
 }
 
-.tiptap ul,
-.tiptap ol {
-    margin-left: 1.25rem;
-    padding-left: 0.75rem;
+.contract-prose > * + * {
+    margin-top: 0.85rem;
 }
 
-.tiptap ul {
+.contract-prose h1 {
+    font-size: 1.875rem;
+    font-weight: 700;
+    color: #f9fafb;
+    margin-top: 1.5rem;
+    margin-bottom: 0.5rem;
+    letter-spacing: -0.02em;
+}
+
+.contract-prose h2 {
+    font-size: 1.375rem;
+    font-weight: 700;
+    color: #f3f4f6;
+    margin-top: 1.25rem;
+    margin-bottom: 0.4rem;
+}
+
+.contract-prose h3 {
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: #e5e7eb;
+    margin-top: 1rem;
+    margin-bottom: 0.3rem;
+}
+
+.contract-prose h4 {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #d1d5db;
+    margin-top: 0.75rem;
+}
+
+.contract-prose p {
+    color: #d1d5db;
+}
+
+.contract-prose strong {
+    color: #f9fafb;
+    font-weight: 600;
+}
+
+.contract-prose em {
+    color: #e5e7eb;
+}
+
+.contract-prose u {
+    text-underline-offset: 3px;
+}
+
+.contract-prose s {
+    color: #9ca3af;
+}
+
+.contract-prose mark {
+    background-color: #fde68a;
+    color: #1c1c1e;
+    border-radius: 2px;
+    padding: 0 2px;
+}
+
+.contract-prose code {
+    font-family: ui-monospace, monospace;
+    font-size: 0.85em;
+    background-color: rgba(255, 255, 255, 0.08);
+    border-radius: 4px;
+    padding: 0.1em 0.4em;
+    color: #a5f3fc;
+}
+
+.contract-prose pre {
+    background-color: #0f0f0f;
+    border: 1px solid #374151;
+    border-radius: 8px;
+    padding: 1rem 1.25rem;
+    overflow-x: auto;
+    margin-top: 0.75rem;
+}
+
+.contract-prose pre code {
+    background: none;
+    padding: 0;
+    font-size: 0.875rem;
+    color: #86efac;
+}
+
+.contract-prose blockquote {
+    border-left: 3px solid #6366f1;
+    padding-left: 1rem;
+    color: #9ca3af;
+    font-style: italic;
+    margin-left: 0;
+}
+
+.contract-prose ul {
     list-style: disc;
+    margin-left: 1.5rem;
+    padding-left: 0.5rem;
+    color: #d1d5db;
 }
 
-.tiptap ol {
+.contract-prose ol {
     list-style: decimal;
+    margin-left: 1.5rem;
+    padding-left: 0.5rem;
+    color: #d1d5db;
+}
+
+.contract-prose li + li {
+    margin-top: 0.25rem;
+}
+
+.contract-prose a {
+    color: #818cf8;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+}
+
+.contract-prose a:hover {
+    color: #a5b4fc;
+}
+
+.contract-prose sup {
+    font-size: 0.7em;
+    vertical-align: super;
+}
+
+.contract-prose sub {
+    font-size: 0.7em;
+    vertical-align: sub;
+}
+
+/* Heading select styling for dark background */
+.contract-prose select option {
+    background-color: #1c1c1e;
+    color: #e5e7eb;
 }
