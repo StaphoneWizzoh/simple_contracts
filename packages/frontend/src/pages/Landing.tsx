@@ -4,7 +4,7 @@ export default function LandingPage() {
     const navigate = useNavigate();
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950 flex flex-col font-sans">
+        <div className="min-h-screen bg-linear-to-br from-gray-950 via-gray-900 to-gray-950 flex flex-col font-sans">
             {/* Navbar */}
             <header className="w-full px-6 py-4 flex justify-between items-center bg-gray-900/50 backdrop-blur-md fixed top-0 z-50 border-b border-gray-800">
                 <div className="text-2xl font-extrabold bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent tracking-tight">
