@@ -17,19 +17,50 @@ export type ContractSaveResponse = {
     status: string;
 };
 
+export type ContractListItem = {
+    id: string;
+    title: string;
+    status: string;
+    counterpartyName: string | null;
+    versionNumber: number;
+    updatedAt: string;
+    createdAt: string;
+};
+
+export type ContractDetail = {
+    id: string;
+    title: string;
+    description: string | null;
+    status: string;
+    counterpartyName: string | null;
+    contentHtml: string;
+    versionNumber: number;
+    updatedAt: string;
+};
+
 export const contractApi = createApi({
     reducerPath: "contractApi",
     baseQuery: fetchBaseQuery({
         baseUrl: "/api",
         credentials: "include",
     }),
+    tagTypes: ["Contract"],
     endpoints: (builder) => ({
+        getContracts: builder.query<{ contracts: ContractListItem[] }, void>({
+            query: () => "/contracts",
+            providesTags: ["Contract"],
+        }),
+        getContract: builder.query<ContractDetail, string>({
+            query: (id) => `/contracts/${id}`,
+            providesTags: (_result, _error, id) => [{ type: "Contract", id }],
+        }),
         saveDraft: builder.mutation<ContractSaveResponse, SaveDraftRequest>({
             query: (body) => ({
                 url: "/contracts/drafts",
                 method: "POST",
                 body,
             }),
+            invalidatesTags: ["Contract"],
         }),
         publishContract: builder.mutation<
             ContractSaveResponse,
@@ -40,8 +71,14 @@ export const contractApi = createApi({
                 method: "POST",
                 body,
             }),
+            invalidatesTags: ["Contract"],
         }),
     }),
 });
 
-export const { useSaveDraftMutation, usePublishContractMutation } = contractApi;
+export const {
+    useGetContractsQuery,
+    useGetContractQuery,
+    useSaveDraftMutation,
+    usePublishContractMutation,
+} = contractApi;
