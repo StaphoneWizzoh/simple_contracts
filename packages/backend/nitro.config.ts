@@ -6,6 +6,7 @@ export default defineNitroConfig({
         watch: ["server"],
         port: 3000,
     },
+    compatibilityDate: "2026-04-18",
     routeRules: {
         "/**": {
             cors: true,
