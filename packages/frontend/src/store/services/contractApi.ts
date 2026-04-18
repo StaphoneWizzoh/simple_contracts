@@ -29,12 +29,17 @@ export type ContractListItem = {
 
 export type ContractDetail = {
     id: string;
+    contractNumber: string | null;
     title: string;
     description: string | null;
     status: string;
+    contractType: string | null;
     counterpartyName: string | null;
+    effectiveAt: string | null;
+    expiresAt: string | null;
     contentHtml: string;
     versionNumber: number;
+    createdAt: string;
     updatedAt: string;
 };
 
