@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { PDFDownloadLink } from "@react-pdf/renderer";
 
 import ContractEditor from "@/components/contracts/ContractEditor";
+import ContractPdfDocument from "@/components/contracts/ContractPdfDocument";
 import { useGetCurrentUserQuery, useLogoutMutation } from "@/store/services/authApi";
 import {
     useGetContractQuery,
@@ -129,6 +131,22 @@ export default function ContractEditorPage() {
                         >
                             My Contracts
                         </button>
+                        {isEditMode && existingContract && (
+                            <PDFDownloadLink
+                                document={
+                                    <ContractPdfDocument
+                                        contract={{
+                                            ...existingContract,
+                                            contentHtml: draftHtml || existingContract.contentHtml,
+                                        }}
+                                    />
+                                }
+                                fileName={`${existingContract.contractNumber ?? existingContract.id}-${existingContract.title.replace(/\s+/g, "-").toLowerCase()}.pdf`}
+                                className="inline-flex items-center rounded-lg border border-indigo-500/50 bg-indigo-900/40 px-4 py-2 text-sm font-medium text-indigo-300 transition hover:bg-indigo-800/50 hover:text-indigo-100"
+                            >
+                                {({ loading }) => loading ? "Preparing PDF…" : "Download PDF"}
+                            </PDFDownloadLink>
+                        )}
                         {isLoggedIn && (
                             <button
                                 type="button"
