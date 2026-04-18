@@ -47,12 +47,17 @@ export default defineEventHandler(async (event) => {
 
     return {
         id: contract.id,
+        contractNumber: contract.contractNumber,
         title: contract.title,
         description: contract.description,
         status: contract.status,
+        contractType: contract.contractType,
         counterpartyName: contract.counterpartyName,
+        effectiveAt: contract.effectiveAt,
+        expiresAt: contract.expiresAt,
         contentHtml: contract.currentVersion?.contentHtml ?? "",
         versionNumber: contract.currentVersion?.versionNumber ?? 1,
+        createdAt: contract.createdAt,
         updatedAt: contract.updatedAt,
     };
 });
