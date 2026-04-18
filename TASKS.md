@@ -156,15 +156,17 @@ Per-contract settings the creator can configure:
 ## Phase 5 — PDF Generation & Export
 
 ### 5.1 PDF Export
-- [ ] Install and configure PDF generation package (e.g., `@react-pdf/renderer` or `puppeteer`)
-- [ ] Contract PDF template:
-  - Org name, logo, contract number
-  - Contract title, type, effective/expiry dates, parties
-  - Full contract content (rendered from HTML)
-  - Signature block per signatory (name, title, org, signature image, signed date, IP)
-  - Audit trail summary page
-- [ ] "Download PDF" button on contract detail page (active/signed contracts)
-- [ ] PDF generation API endpoint: `GET /api/contracts/:id/pdf`
+- [x] Install `@react-pdf/renderer` in frontend
+- [x] Contract PDF template (`ContractPdfDocument.tsx`):
+  - Org name, contract number, status badge
+  - Contract title, type, effective/expiry dates, counterparty, version, created/updated dates
+  - Full contract content (HTML parsed to PDF elements via `htmlToPdfElements.tsx`)
+  - Signature block (issuing party + counterparty)
+  - Page numbers and generated timestamp in footer
+- [x] "Download PDF" button on contract editor page (visible when editing existing contracts)
+- [x] HTML-to-PDF parser supporting: headings, paragraphs, bold, italic, underline, strikethrough, code, blockquote, ordered & unordered lists, hr
+- [ ] Signature block: populate with actual signatories once e-signature phase is built
+- [ ] Audit trail summary page (add after Phase 4 — audit trail)
 - [ ] Signed contract PDF stored/cached after all signatures collected
 
 ---
@@ -257,5 +259,5 @@ Available reports (all exportable to PDF/CSV):
 | Templates | Not started |
 | Approval workflow | Not started |
 | E-signatures | Not started |
-| PDF export | Not started |
+| PDF export | Done (basic — no signatories/audit trail yet) |
 | Reporting | Not started |
