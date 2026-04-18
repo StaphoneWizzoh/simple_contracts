@@ -170,6 +170,34 @@ cd packages/backend && npm run build
 3. Use Redux hooks: `useAppDispatch`, `useAppSelector`
 4. Keep API calls in separate slices/services
 
+## Installing packages
+
+```bash
+npm install react-icons -w packages/frontend --save
+npm install
+```
+
+Add a new frontend dependency:
+
+```bash
+npm install <package-name> -w packages/frontend
+
+```
+
+Add a new frontend dev dependency:
+
+```bash
+npm install -D <package-name> -w packages/frontend
+
+```
+
+Install only frontend workspace deps:
+
+```bash
+cd "c:\Users\Staphone Omondi\Desktop\Projects\simple_contracts"
+npm install -w packages/frontend
+```
+
 ## 📚 Resources
 
 - [Redux Toolkit Docs](https://redux-toolkit.js.org/)
