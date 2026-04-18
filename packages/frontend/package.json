@@ -9,6 +9,7 @@
         "lint": "eslint src --ext ts,tsx"
     },
     "dependencies": {
+        "@react-pdf/renderer": "^4.5.1",
         "@reduxjs/toolkit": "^2.11.2",
         "@tiptap/extension-highlight": "^3.22.3",
         "@tiptap/extension-link": "^3.22.3",
