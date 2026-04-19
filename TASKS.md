@@ -16,37 +16,29 @@
 ## Phase 1 — Multi-tenancy & Organisation Setup
 
 ### 1.1 Organisation Onboarding
-- [ ] Org creation flow on first signup (name, legal name, logo upload)
-- [ ] Invite members to org via email (generates time-limited invite token)
-- [ ] Accept/decline invite flow (invitee lands on invite page, no account required initially)
-- [ ] Org settings page (update name, logo, timezone, default currency)
+- [x] Org creation flow on first signup (name, legal name) — `OrgOnboardingPage`
+- [x] Invite members to org via email (generates time-limited token) — `POST /api/org/invites`
+- [x] Accept invite flow — `/invites/:token` public page, requires login to accept
+- [x] Org settings page — `/org/settings`
+- [-] Logo upload (deferred — needs file storage)
 
 ### 1.2 Custom RBAC (Role-Based Access Control)
-- [ ] Predefined base permission set:
-  - `create_contracts` — create contracts from templates or scratch
-  - `create_templates` — create and manage contract templates
-  - `review_contracts` — be assigned as reviewer on contracts
-  - `approve_contracts` — be assigned as approver on contracts
-  - `send_for_signing` — send contracts out for signature
-  - `manage_users` — invite/remove members, assign roles
-  - `manage_roles` — create/edit/delete org roles
-  - `view_reports` — access reporting dashboard
-  - `manage_org` — org-level settings
-- [ ] Role management UI (admin can create roles, assign permission checkboxes)
-- [ ] Assign/change roles for org members
-- [ ] Permission guard middleware on all API routes
-- [ ] Permission guard components on all frontend actions/pages
-- [ ] Seed default roles per new org:
-  - **Org Admin** — all permissions
-  - **Contract Manager** — create, review, approve, send, view reports
-  - **Contract Creator** — create contracts only
-  - **Viewer** — read-only
+- [x] Predefined base permission set:
+  - `create_contracts`, `create_templates`, `review_contracts`, `approve_contracts`
+  - `send_for_signing`, `manage_users`, `manage_roles`, `view_reports`, `manage_org`
+- [x] Role management UI (`/org/roles`) — create, edit, delete custom roles with permission checkboxes
+- [x] Assign/change roles for org members (`/org/members`)
+- [x] Permission guard middleware (`requirePermission`, `getOrgContext`) on all org/member/role/invite routes
+- [x] Seed default roles per new org: Admin, Contract Manager, Contract Creator, Viewer
+- [x] Permission guard on frontend routes — `ProtectedRoute` component (auth → login, no org → onboarding, no permission → 403 screen)
+- [x] `requirePermission(CREATE_CONTRACTS)` on drafts + publish routes; `getOrgContext` on list + detail routes
+- [x] Login page respects `from` redirect state set by `ProtectedRoute`
 
-### 1.3 Database Changes Required
-- [ ] `OrgRole` model — org-scoped roles with JSON permission set
-- [ ] `OrgRolePermission` model or JSON field on `OrgRole`
-- [ ] Update `OrganizationMember.role` to reference `OrgRole` FK instead of plain string
-- [ ] `OrgInvite` model — email, token, expiresAt, status, roleId
+### 1.3 Database Changes
+- [x] `OrgRole` model — org-scoped roles with JSON permission set, `isSystemRole` flag
+- [x] `OrganizationMember.roleId` → FK to `OrgRole`
+- [x] `OrgInvite` model — email, token, expiresAt, status, roleId, invitedByUserId
+- [x] Migration: `20260419072522_add_rbac`
 
 ---
 
@@ -255,7 +247,7 @@ Available reports (all exportable to PDF/CSV):
 | Rich text editor (Tiptap) | Done |
 | Contract versioning | Done |
 | Audit log (basic) | Done |
-| RBAC | Not started |
+| RBAC | Done |
 | Templates | Not started |
 | Approval workflow | Not started |
 | E-signatures | Not started |
