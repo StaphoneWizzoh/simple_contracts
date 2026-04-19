@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 import { useSignupMutation } from "@/store/services/authApi";
 
 function SignupPage() {
@@ -7,16 +8,17 @@ function SignupPage() {
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [name, setName] = useState("");
-    const [signup, { isLoading, error }] = useSignupMutation();
+    const [signup, { isLoading }] = useSignupMutation();
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         try {
             await signup({ email, password, name }).unwrap();
-            // Redirect to login after successful signup
+            toast.success("Account created! Please log in.");
             navigate("/auth/login");
-        } catch (err) {
-            console.error("Signup failed:", err);
+        } catch (err: unknown) {
+            const e = err as { data?: { message?: string; statusMessage?: string } };
+            toast.error(e.data?.message ?? e.data?.statusMessage ?? "Signup failed. Please try again.");
         }
     };
 
@@ -34,7 +36,7 @@ function SignupPage() {
 
             {/* Form Container */}
             <div className="relative z-10 w-full max-w-md p-8 bg-gray-800/50 backdrop-blur-xl rounded-2xl shadow-2xl border border-gray-700/50">
-                <h2 className="text-3xl font-bold text-center bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent mb-8">
+                <h2 className="text-3xl font-bold text-center bg-linear-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent mb-8">
                     Create Account
                 </h2>
                 <form
@@ -68,16 +70,11 @@ function SignupPage() {
                     <button
                         type="submit"
                         disabled={isLoading}
-                        className="w-full px-4 py-3 mt-2 text-white font-semibold bg-gradient-to-r from-indigo-600 to-purple-600 rounded-lg hover:from-indigo-500 hover:to-purple-500 focus:outline-none disabled:opacity-50 transition-all shadow-lg hover:shadow-indigo-500/50"
+                        className="w-full px-4 py-3 mt-2 text-white font-semibold bg-linear-to-r from-indigo-600 to-purple-600 rounded-lg hover:from-indigo-500 hover:to-purple-500 focus:outline-none disabled:opacity-50 transition-all shadow-lg hover:shadow-indigo-500/50"
                     >
                         {isLoading ? "Signing up..." : "Sign Up"}
                     </button>
                 </form>
-                {error && (
-                    <p className="mt-4 text-sm text-center text-red-400">
-                        {String(error)}
-                    </p>
-                )}
                 <p className="mt-6 text-center text-gray-400">
                     Already have an account?{" "}
                     <button
