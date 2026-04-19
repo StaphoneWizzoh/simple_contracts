@@ -1,34 +1,18 @@
-import { auth } from "../../../auth";
 import { prisma } from "../../../db";
+import { getOrgContext } from "../../../utils/permissions";
 
 export default defineEventHandler(async (event) => {
-    const session = await auth.api.getSession({
-        headers: event.node.req.headers,
-    });
-
-    if (!session?.user?.id) {
-        throw createError({ statusCode: 401, statusMessage: "Unauthorized" });
-    }
-
-    const userId = session.user.id;
+    const ctx = await getOrgContext(event);
     const contractId = getRouterParam(event, "id");
 
     if (!contractId) {
         throw createError({ statusCode: 400, statusMessage: "Contract ID required" });
     }
 
-    const membership = await prisma.organizationMember.findFirst({
-        where: { userId },
-    });
-
-    if (!membership) {
-        throw createError({ statusCode: 404, statusMessage: "Contract not found" });
-    }
-
     const contract = await prisma.contract.findFirst({
         where: {
             id: contractId,
-            organizationId: membership.organizationId,
+            organizationId: ctx.organizationId,
         },
         include: {
             currentVersion: {
