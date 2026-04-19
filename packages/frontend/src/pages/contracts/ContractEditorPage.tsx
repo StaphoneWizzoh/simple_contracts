@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { PDFDownloadLink } from "@react-pdf/renderer";
+import { toast } from "sonner";
 
 import ContractEditor from "@/components/contracts/ContractEditor";
 import ContractPdfDocument from "@/components/contracts/ContractPdfDocument";
@@ -27,7 +28,6 @@ export default function ContractEditorPage() {
     const [description, setDescription] = useState("");
     const [counterpartyName, setCounterpartyName] = useState("");
     const [contractId, setContractId] = useState<string | undefined>(routeId);
-    const [notice, setNotice] = useState("");
     const [initialContent, setInitialContent] = useState<string | undefined>(undefined);
 
     const { data: currentUser, isLoading: isSessionLoading } = useGetCurrentUserQuery();
@@ -43,7 +43,6 @@ export default function ContractEditorPage() {
 
     const isLoggedIn = Boolean(currentUser?.id);
 
-    // Populate form when loading an existing contract
     useEffect(() => {
         if (existingContract) {
             setTitle(existingContract.title);
@@ -55,7 +54,7 @@ export default function ContractEditorPage() {
     }, [existingContract]);
 
     const handleSaveDraft = async () => {
-        if (!isLoggedIn) { setNotice("Please login to save drafts."); return; }
+        if (!isLoggedIn) { toast.error("Please login to save drafts."); return; }
         try {
             const response = await saveDraft({
                 contractId,
@@ -65,15 +64,15 @@ export default function ContractEditorPage() {
                 contentHtml: draftHtml,
             }).unwrap();
             setContractId(response.contractId);
-            setNotice(`Draft saved (v${response.versionNumber})`);
+            toast.success(`Draft saved (v${response.versionNumber})`);
         } catch (error) {
-            setNotice(`Could not save draft: ${getErrorMessage(error)}`);
+            toast.error(`Could not save draft: ${getErrorMessage(error)}`);
         }
     };
 
     const handlePublish = async () => {
-        if (!isLoggedIn) { setNotice("Please login to publish."); return; }
-        if (!contractId) { setNotice("Save a draft first before publishing."); return; }
+        if (!isLoggedIn) { toast.error("Please login to publish."); return; }
+        if (!contractId) { toast.error("Save a draft first before publishing."); return; }
         try {
             const response = await publishContract({
                 contractId,
@@ -82,9 +81,9 @@ export default function ContractEditorPage() {
                 counterpartyName,
                 contentHtml: draftHtml,
             }).unwrap();
-            setNotice(`Contract moved to ${response.status} (v${response.versionNumber})`);
+            toast.success(`Contract moved to ${response.status} (v${response.versionNumber})`);
         } catch (error) {
-            setNotice(`Could not publish: ${getErrorMessage(error)}`);
+            toast.error(`Could not publish: ${getErrorMessage(error)}`);
         }
     };
 
@@ -232,11 +231,6 @@ export default function ContractEditorPage() {
                         </div>
                     </div>
 
-                    {notice && (
-                        <p className="md:col-span-3 text-sm text-indigo-200 bg-indigo-500/10 rounded-lg px-3 py-2">
-                            {notice}
-                        </p>
-                    )}
                     {contractId && (
                         <p className="md:col-span-3 text-xs text-gray-500">
                             Contract ID: {contractId}
