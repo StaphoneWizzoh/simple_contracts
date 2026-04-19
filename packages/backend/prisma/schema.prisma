@@ -11,40 +11,41 @@ datasource db {
 }
 
 model User {
-  id            String     @id
-  email         String     @unique
-  emailVerified Boolean    @default(false)
+  id            String   @id
+  email         String   @unique
+  emailVerified Boolean  @default(false)
   name          String
   image         String?
-  createdAt     DateTime   @default(now())
-  updatedAt     DateTime   @updatedAt
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   accounts                Account[]
   sessions                Session[]
   organizationMemberships OrganizationMember[]
-  ownedContracts          Contract[]            @relation("ContractOwner")
-  createdContracts        Contract[]            @relation("ContractCreator")
+  ownedContracts          Contract[]           @relation("ContractOwner")
+  createdContracts        Contract[]           @relation("ContractCreator")
   authoredVersions        ContractVersion[]
   partyAssignments        ContractParty[]
-  signatureActions        ContractSignature[]   @relation("SignatureActor")
-  auditEvents             ContractAuditLog[]    @relation("AuditActor")
+  signatureActions        ContractSignature[]  @relation("SignatureActor")
+  auditEvents             ContractAuditLog[]   @relation("AuditActor")
+  sentInvites             OrgInvite[]          @relation("SentInvites")
 }
 
 model Account {
-  id                      String    @id
-  userId                  String
-  user                    User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  accountId               String
-  providerId              String
-  accessToken             String?
-  refreshToken            String?
-  accessTokenExpiresAt    DateTime?
-  refreshTokenExpiresAt   DateTime?
-  scope                   String?
-  idToken                 String?
-  password                String?
-  createdAt               DateTime  @default(now())
-  updatedAt               DateTime  @updatedAt
+  id                    String    @id
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accountId             String
+  providerId            String
+  accessToken           String?
+  refreshToken          String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  idToken               String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
 
   @@unique([providerId, accountId])
 }
@@ -62,69 +63,113 @@ model Session {
 }
 
 model Verification {
-  id        String   @id @default(cuid())
+  id         String   @id @default(cuid())
   identifier String
-  value     String
-  expiresAt DateTime
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 }
 
 model Organization {
   id        String   @id @default(cuid())
   name      String
   legalName String?
+  logoUrl   String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   members   OrganizationMember[]
   contracts Contract[]
+  roles     OrgRole[]
+  invites   OrgInvite[]
 
   @@index([name])
 }
 
+model OrgRole {
+  id             String   @id @default(cuid())
+  organizationId String
+  name           String
+  description    String?
+  permissions    String   @default("[]")
+  isSystemRole   Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  members      OrganizationMember[]
+  invites      OrgInvite[]
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
+}
+
 model OrganizationMember {
-  id             String           @id @default(cuid())
+  id             String   @id @default(cuid())
   organizationId String
   userId         String
-  role           String           @default("MEMBER")
-  joinedAt       DateTime         @default(now())
+  roleId         String
+  joinedAt       DateTime @default(now())
 
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role         OrgRole      @relation(fields: [roleId], references: [id], onDelete: Restrict)
 
   @@unique([organizationId, userId])
   @@index([userId])
+  @@index([roleId])
+}
+
+model OrgInvite {
+  id              String    @id @default(cuid())
+  organizationId  String
+  email           String
+  roleId          String
+  token           String    @unique
+  invitedByUserId String
+  status          String    @default("PENDING")
+  expiresAt       DateTime
+  acceptedAt      DateTime?
+  createdAt       DateTime  @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  role         OrgRole      @relation(fields: [roleId], references: [id], onDelete: Restrict)
+  invitedBy    User         @relation("SentInvites", fields: [invitedByUserId], references: [id], onDelete: Cascade)
+
+  @@index([token])
+  @@index([email])
+  @@index([organizationId])
 }
 
 model Contract {
-  id                String         @id @default(cuid())
-  organizationId    String
-  ownerUserId       String
-  createdByUserId   String
-  contractNumber    String
-  title             String
-  description       String?
-  contractType      String         @default("OTHER")
-  status            String         @default("DRAFT")
-  counterpartyName  String?
-  effectiveAt       DateTime?
-  expiresAt         DateTime?
-  terminatedAt      DateTime?
-  currencyCode      String         @default("USD")
-  totalValueMinor   Int?
-  currentVersionId  String?        @unique
-  createdAt         DateTime       @default(now())
-  updatedAt         DateTime       @updatedAt
+  id               String    @id @default(cuid())
+  organizationId   String
+  ownerUserId      String
+  createdByUserId  String
+  contractNumber   String
+  title            String
+  description      String?
+  contractType     String    @default("OTHER")
+  status           String    @default("DRAFT")
+  counterpartyName String?
+  effectiveAt      DateTime?
+  expiresAt        DateTime?
+  terminatedAt     DateTime?
+  currencyCode     String    @default("USD")
+  totalValueMinor  Int?
+  currentVersionId String?   @unique
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 
-  organization      Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  ownerUser         User              @relation("ContractOwner", fields: [ownerUserId], references: [id], onDelete: Restrict)
-  createdByUser     User              @relation("ContractCreator", fields: [createdByUserId], references: [id], onDelete: Restrict)
-  currentVersion    ContractVersion?  @relation("CurrentContractVersion", fields: [currentVersionId], references: [id], onDelete: SetNull)
-  versions          ContractVersion[] @relation("ContractVersions")
-  parties           ContractParty[]
-  signatures        ContractSignature[]
-  auditLogs         ContractAuditLog[]
+  organization   Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  ownerUser      User                @relation("ContractOwner", fields: [ownerUserId], references: [id], onDelete: Restrict)
+  createdByUser  User                @relation("ContractCreator", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  currentVersion ContractVersion?    @relation("CurrentContractVersion", fields: [currentVersionId], references: [id], onDelete: SetNull)
+  versions       ContractVersion[]   @relation("ContractVersions")
+  parties        ContractParty[]
+  signatures     ContractSignature[]
+  auditLogs      ContractAuditLog[]
 
   @@unique([organizationId, contractNumber])
   @@index([organizationId, status])
@@ -133,63 +178,63 @@ model Contract {
 }
 
 model ContractVersion {
-  id               String   @id @default(cuid())
-  contractId       String
-  versionNumber    Int
-  title            String?
-  contentHtml      String
-  contentJson      String?
-  contentText      String?
-  changeSummary    String?
-  createdByUserId  String?
-  createdAt        DateTime @default(now())
+  id              String   @id @default(cuid())
+  contractId      String
+  versionNumber   Int
+  title           String?
+  contentHtml     String
+  contentJson     String?
+  contentText     String?
+  changeSummary   String?
+  createdByUserId String?
+  createdAt       DateTime @default(now())
 
-  contract         Contract          @relation("ContractVersions", fields: [contractId], references: [id], onDelete: Cascade)
-  createdByUser    User?             @relation(fields: [createdByUserId], references: [id], onDelete: SetNull)
-  currentForContract Contract?       @relation("CurrentContractVersion")
-  signatures       ContractSignature[]
+  contract           Contract            @relation("ContractVersions", fields: [contractId], references: [id], onDelete: Cascade)
+  createdByUser      User?               @relation(fields: [createdByUserId], references: [id], onDelete: SetNull)
+  currentForContract Contract?           @relation("CurrentContractVersion")
+  signatures         ContractSignature[]
 
   @@unique([contractId, versionNumber])
   @@index([createdByUserId])
 }
 
 model ContractParty {
-  id              String    @id @default(cuid())
-  contractId      String
-  userId          String?
-  role            String    @default("COUNTERPARTY")
-  legalName       String
-  email           String?
-  title           String?
-  organization    String?
-  signingOrder    Int?
-  createdAt       DateTime  @default(now())
+  id           String   @id @default(cuid())
+  contractId   String
+  userId       String?
+  role         String   @default("COUNTERPARTY")
+  legalName    String
+  email        String?
+  title        String?
+  organization String?
+  signingOrder Int?
+  createdAt    DateTime @default(now())
 
-  contract        Contract           @relation(fields: [contractId], references: [id], onDelete: Cascade)
-  user            User?              @relation(fields: [userId], references: [id], onDelete: SetNull)
-  signatures      ContractSignature[]
+  contract   Contract            @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  user       User?               @relation(fields: [userId], references: [id], onDelete: SetNull)
+  signatures ContractSignature[]
 
   @@index([contractId, role])
   @@index([userId])
 }
 
 model ContractSignature {
-  id                String          @id @default(cuid())
+  id                String    @id @default(cuid())
   contractId        String
   contractVersionId String?
   partyId           String
-  status            String          @default("PENDING")
-  requestedAt       DateTime        @default(now())
+  status            String    @default("PENDING")
+  requestedAt       DateTime  @default(now())
   viewedAt          DateTime?
   signedAt          DateTime?
   declinedAt        DateTime?
   reason            String?
   signedByUserId    String?
 
-  contract          Contract         @relation(fields: [contractId], references: [id], onDelete: Cascade)
-  contractVersion   ContractVersion? @relation(fields: [contractVersionId], references: [id], onDelete: SetNull)
-  party             ContractParty    @relation(fields: [partyId], references: [id], onDelete: Cascade)
-  signedByUser      User?            @relation("SignatureActor", fields: [signedByUserId], references: [id], onDelete: SetNull)
+  contract        Contract         @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  contractVersion ContractVersion? @relation(fields: [contractVersionId], references: [id], onDelete: SetNull)
+  party           ContractParty    @relation(fields: [partyId], references: [id], onDelete: Cascade)
+  signedByUser    User?            @relation("SignatureActor", fields: [signedByUserId], references: [id], onDelete: SetNull)
 
   @@index([contractId, status])
   @@index([partyId])
@@ -198,15 +243,15 @@ model ContractSignature {
 }
 
 model ContractAuditLog {
-  id             String            @id @default(cuid())
-  contractId     String
-  actorUserId    String?
-  eventType      String
-  details        String?
-  createdAt      DateTime          @default(now())
+  id          String   @id @default(cuid())
+  contractId  String
+  actorUserId String?
+  eventType   String
+  details     String?
+  createdAt   DateTime @default(now())
 
-  contract       Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
-  actorUser      User?    @relation("AuditActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+  contract  Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  actorUser User?    @relation("AuditActor", fields: [actorUserId], references: [id], onDelete: SetNull)
 
   @@index([contractId, createdAt])
   @@index([actorUserId])
