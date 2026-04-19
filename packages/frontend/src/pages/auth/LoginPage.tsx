@@ -1,21 +1,24 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
+import { toast } from "sonner";
 import { useLoginMutation } from "@/store/services/authApi";
 
 function LoginPage() {
     const navigate = useNavigate();
+    const location = useLocation();
+    const from = (location.state as { from?: string } | null)?.from ?? "/contracts";
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
-    const [login, { isLoading, error }] = useLoginMutation();
+    const [login, { isLoading }] = useLoginMutation();
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         try {
             await login({ email, password }).unwrap();
-            // Handle successful login - redirect to dashboard
-            navigate("/contracts/new");
-        } catch (err) {
-            console.error("Login failed:", err);
+            navigate(from, { replace: true });
+        } catch (err: unknown) {
+            const e = err as { data?: { message?: string; statusMessage?: string } };
+            toast.error(e.data?.message ?? e.data?.statusMessage ?? "Invalid email or password.");
         }
     };
 
@@ -33,7 +36,7 @@ function LoginPage() {
 
             {/* Form Container */}
             <div className="relative z-10 w-full max-w-md p-8 bg-gray-800/50 backdrop-blur-xl rounded-2xl shadow-2xl border border-gray-700/50">
-                <h2 className="text-3xl font-bold text-center bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent mb-8">
+                <h2 className="text-3xl font-bold text-center bg-linear-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent mb-8">
                     Welcome Back
                 </h2>
                 <form
@@ -59,16 +62,11 @@ function LoginPage() {
                     <button
                         type="submit"
                         disabled={isLoading}
-                        className="w-full px-4 py-3 mt-2 text-white font-semibold bg-gradient-to-r from-indigo-600 to-purple-600 rounded-lg hover:from-indigo-500 hover:to-purple-500 focus:outline-none disabled:opacity-50 transition-all shadow-lg hover:shadow-indigo-500/50"
+                        className="w-full px-4 py-3 mt-2 text-white font-semibold bg-linear-to-r from-indigo-600 to-purple-600 rounded-lg hover:from-indigo-500 hover:to-purple-500 focus:outline-none disabled:opacity-50 transition-all shadow-lg hover:shadow-indigo-500/50"
                     >
                         {isLoading ? "Logging in..." : "Login"}
                     </button>
                 </form>
-                {error && (
-                    <p className="mt-4 text-sm text-center text-red-400">
-                        {String(error)}
-                    </p>
-                )}
                 <p className="mt-6 text-center text-gray-400">
                     Don't have an account?{" "}
                     <button
