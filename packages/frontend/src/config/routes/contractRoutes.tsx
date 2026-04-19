@@ -1,10 +1,7 @@
 import { RouteObject } from "react-router-dom";
 
-import RouteWrapper from "@/components/RouteWrapper";
-import {
-    ContractEditorPage,
-    ContractsPage,
-} from "@/config/routes/lazyComponents";
+import ProtectedRoute from "@/components/ProtectedRoute";
+import { ContractEditorPage, ContractsPage } from "@/config/routes/lazyComponents";
 
 export const contractRoutes: RouteObject = {
     path: "/contracts",
@@ -12,25 +9,25 @@ export const contractRoutes: RouteObject = {
         {
             index: true,
             element: (
-                <RouteWrapper fallback={<p>Loading…</p>}>
+                <ProtectedRoute>
                     <ContractsPage />
-                </RouteWrapper>
+                </ProtectedRoute>
             ),
         },
         {
             path: "new",
             element: (
-                <RouteWrapper fallback={<p>Loading…</p>}>
+                <ProtectedRoute permission="create_contracts">
                     <ContractEditorPage />
-                </RouteWrapper>
+                </ProtectedRoute>
             ),
         },
         {
             path: ":id",
             element: (
-                <RouteWrapper fallback={<p>Loading…</p>}>
+                <ProtectedRoute>
                     <ContractEditorPage />
-                </RouteWrapper>
+                </ProtectedRoute>
             ),
         },
     ],
