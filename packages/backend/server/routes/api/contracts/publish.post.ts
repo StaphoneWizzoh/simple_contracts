@@ -1,5 +1,5 @@
-import { auth } from "../../../auth";
 import { prisma } from "../../../db";
+import { requirePermission, PERMISSIONS } from "../../../utils/permissions";
 
 type PublishBody = {
     contractId?: string;
@@ -10,55 +10,23 @@ type PublishBody = {
 };
 
 export default defineEventHandler(async (event) => {
-    const session = await auth.api.getSession({
-        headers: event.node.req.headers,
-    });
-
-    if (!session?.user?.id) {
-        throw createError({ statusCode: 401, statusMessage: "Unauthorized" });
-    }
+    const ctx = await requirePermission(event, PERMISSIONS.CREATE_CONTRACTS);
 
     const body = (await readBody(event)) as PublishBody;
     if (!body?.contentHtml || !body?.title?.trim()) {
-        throw createError({
-            statusCode: 400,
-            statusMessage: "title and contentHtml are required",
-        });
+        throw createError({ statusCode: 400, statusMessage: "title and contentHtml are required" });
     }
-
-    const userId = session.user.id;
-
     if (!body.contractId) {
-        throw createError({
-            statusCode: 400,
-            statusMessage: "contractId is required to publish",
-        });
+        throw createError({ statusCode: 400, statusMessage: "contractId is required to publish" });
     }
 
     const existing = await prisma.contract.findFirst({
-        where: {
-            id: body.contractId,
-            organization: {
-                members: {
-                    some: {
-                        userId,
-                    },
-                },
-            },
-        },
-        include: {
-            versions: {
-                orderBy: { versionNumber: "desc" },
-                take: 1,
-            },
-        },
+        where: { id: body.contractId, organizationId: ctx.organizationId },
+        include: { versions: { orderBy: { versionNumber: "desc" }, take: 1 } },
     });
 
     if (!existing) {
-        throw createError({
-            statusCode: 404,
-            statusMessage: "Contract not found",
-        });
+        throw createError({ statusCode: 404, statusMessage: "Contract not found" });
     }
 
     const nextVersionNumber = (existing.versions[0]?.versionNumber ?? 0) + 1;
@@ -70,7 +38,7 @@ export default defineEventHandler(async (event) => {
             title: body.title.trim(),
             contentHtml: body.contentHtml,
             contentText: body.contentHtml.replace(/<[^>]+>/g, " ").trim(),
-            createdByUserId: userId,
+            createdByUserId: ctx.userId,
             changeSummary: "Submitted for review",
         },
     });
@@ -89,13 +57,9 @@ export default defineEventHandler(async (event) => {
     await prisma.contractAuditLog.create({
         data: {
             contractId: existing.id,
-            actorUserId: userId,
+            actorUserId: ctx.userId,
             eventType: "STATUS_CHANGED",
-            details: JSON.stringify({
-                from: existing.status,
-                to: "REVIEW",
-                versionNumber: nextVersionNumber,
-            }),
+            details: JSON.stringify({ from: existing.status, to: "REVIEW", versionNumber: nextVersionNumber }),
         },
     });
 
