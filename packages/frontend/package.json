@@ -6,7 +6,8 @@
         "dev": "vite",
         "build": "tsc && vite build",
         "preview": "vite preview",
-        "lint": "eslint src --ext ts,tsx"
+        "lint": "eslint src --ext ts,tsx",
+        "docs": "typedoc && typedoc --options typedoc.html.json"
     },
     "dependencies": {
         "@react-pdf/renderer": "^4.5.1",
@@ -21,11 +22,13 @@
         "@tiptap/pm": "^3.22.3",
         "@tiptap/react": "^3.22.3",
         "@tiptap/starter-kit": "^3.22.3",
+        "dayjs": "^1.11.20",
         "react": "^18.3.1",
         "react-dom": "^18.3.1",
         "react-icons": "^5.6.0",
         "react-redux": "^9.2.0",
         "react-router-dom": "^6.22.0",
+        "react-select": "^5.10.2",
         "sonner": "^2.0.7"
     },
     "devDependencies": {
@@ -37,6 +40,8 @@
         "autoprefixer": "^10.5.0",
         "postcss": "^8.5.10",
         "tailwindcss": "^4.2.2",
+        "typedoc": "^0.28.19",
+        "typedoc-plugin-markdown": "^4.11.0",
         "typescript": "^5.3.3",
         "vite": "^5.1.0"
     }
