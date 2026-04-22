@@ -13,7 +13,8 @@
         "build": "npm run build --workspaces --if-present",
         "health:backend": "curl -fsS http://localhost:3000/api/health",
         "health:proxy": "curl -fsS http://localhost:5173/api/health",
-        "health": "npm run health:backend && npm run health:proxy && echo HEALTH_OK"
+        "health": "npm run health:backend && npm run health:proxy && echo HEALTH_OK",
+        "docs": "npm run docs --workspaces --if-present"
     },
     "devDependencies": {
         "concurrently": "^9.2.1"
