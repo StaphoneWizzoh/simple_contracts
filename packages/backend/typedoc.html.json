@@ -1,0 +1,14 @@
+{
+    "name": "SimpleContracts Backend",
+    "entryPoints": [
+        "server/utils/permissions.ts",
+        "server/auth.ts",
+        "server/db.ts"
+    ],
+    "entryPointStrategy": "resolve",
+    "out": "docs/html",
+    "tsconfig": "tsconfig.typedoc.json",
+    "excludePrivate": true,
+    "excludeExternals": true,
+    "skipErrorChecking": true
+}
