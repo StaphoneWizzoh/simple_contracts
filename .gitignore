@@ -12,3 +12,5 @@ dist
 
 .nitro
 
+packages/frontend/docs
+packages/backend/docs
