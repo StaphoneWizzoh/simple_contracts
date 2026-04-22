@@ -11,6 +11,13 @@ import {
     useSendInviteMutation,
     useRevokeInviteMutation,
 } from "@/store/services/orgApi";
+import {
+    PageShell, PageHeader, TabButton,
+    Card, Button, Input, Select, FormField, SectionLabel, EmptyState,
+    type SingleValue,
+} from "@/components/ui";
+
+type RoleOption = { value: string; label: string };
 
 export default function MembersPage() {
     const navigate = useNavigate();
@@ -25,13 +32,15 @@ export default function MembersPage() {
     const [revokeInvite] = useRevokeInviteMutation();
 
     const [inviteEmail, setInviteEmail] = useState("");
-    const [inviteRoleId, setInviteRoleId] = useState("");
+    const [inviteRole, setInviteRole] = useState<SingleValue<RoleOption>>(null);
     const [inviteLink, setInviteLink] = useState("");
 
     const canManage = orgData?.permissions.includes("manage_users") ?? false;
     const roles = rolesData?.roles ?? [];
     const members = membersData?.members ?? [];
     const invites = invitesData?.invites ?? [];
+
+    const roleOptions: RoleOption[] = roles.map((r) => ({ value: r.id, label: r.name }));
 
     const handleUpdateRole = async (memberId: string, roleId: string, memberName: string) => {
         try {
@@ -66,72 +75,73 @@ export default function MembersPage() {
 
     const handleSendInvite = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!inviteEmail.trim() || !inviteRoleId) return;
+        if (!inviteEmail.trim() || !inviteRole) return;
         setInviteLink("");
         try {
-            const res = await sendInvite({ email: inviteEmail.trim(), roleId: inviteRoleId }).unwrap();
+            const res = await sendInvite({ email: inviteEmail.trim(), roleId: inviteRole.value }).unwrap();
             const link = `${window.location.origin}/invites/${res.invite.token}`;
             setInviteLink(link);
             toast.success(`Invite sent to ${res.invite.email}`);
             setInviteEmail("");
-            setInviteRoleId("");
+            setInviteRole(null);
         } catch (err: unknown) {
             const e = err as { data?: { statusMessage?: string } };
             toast.error(e.data?.statusMessage ?? "Failed to send invite");
         }
     };
 
+    const tabs = (
+        <>
+            <TabButton onClick={() => navigate("/org/settings")}>Settings</TabButton>
+            <TabButton onClick={() => navigate("/org/roles")}>Roles</TabButton>
+            <TabButton variant="ghost" onClick={() => navigate("/contracts")}>Contracts</TabButton>
+        </>
+    );
+
     return (
         <PageShell>
-            <header className="flex items-center justify-between mb-8">
-                <div>
-                    <p className="text-xs font-bold uppercase tracking-[0.2em] text-indigo-400">Organisation</p>
-                    <h1 className="text-2xl font-bold text-white mt-0.5">Members</h1>
-                </div>
-                <nav className="flex gap-2">
-                    <TabBtn onClick={() => navigate("/org/settings")}>Settings</TabBtn>
-                    <TabBtn onClick={() => navigate("/org/roles")}>Roles</TabBtn>
-                    <TabBtn onClick={() => navigate("/contracts")} variant="ghost">Contracts</TabBtn>
-                </nav>
-            </header>
+            <PageHeader eyebrow="Organisation" title="Members" tabs={tabs} />
 
             {/* Current members */}
             <section className="mb-8">
-                <h2 className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-3">Current Members</h2>
+                <SectionLabel className="mb-3">Current Members</SectionLabel>
                 {loadingMembers ? (
-                    <p className="text-gray-400 text-sm">Loading…</p>
+                    <p className="text-sm text-content-muted">Loading…</p>
+                ) : members.length === 0 ? (
+                    <EmptyState title="No members yet" description="Invite team members below." />
                 ) : (
                     <div className="flex flex-col gap-2">
                         {members.map((m) => (
-                            <div key={m.id} className="flex items-center justify-between rounded-xl border border-gray-700/60 bg-gray-900/60 px-5 py-3">
+                            <Card key={m.id} padding="none" className="flex items-center justify-between px-5 py-3">
                                 <div className="flex flex-col gap-0.5">
-                                    <span className="text-sm font-semibold text-white">{m.name}</span>
-                                    <span className="text-xs text-gray-400">{m.email}</span>
+                                    <span className="text-sm font-semibold text-content-primary">{m.name}</span>
+                                    <span className="text-xs text-content-muted">{m.email}</span>
                                 </div>
                                 <div className="flex items-center gap-3">
                                     {canManage ? (
-                                        <select
-                                            value={m.roleId}
-                                            onChange={(e) => handleUpdateRole(m.id, e.target.value, m.name)}
-                                            className="rounded-lg border border-gray-700 bg-gray-800 px-3 py-1.5 text-sm text-gray-200 outline-none focus:ring-2 ring-indigo-500"
-                                        >
-                                            {roles.map((r) => (
-                                                <option key={r.id} value={r.id}>{r.name}</option>
-                                            ))}
-                                        </select>
+                                        <Select<RoleOption>
+                                            options={roleOptions}
+                                            value={roleOptions.find((r) => r.value === m.roleId) ?? null}
+                                            onChange={(opt) => opt && handleUpdateRole(m.id, opt.value, m.name)}
+                                            isSearchable={false}
+                                            className="w-44"
+                                        />
                                     ) : (
-                                        <span className="text-xs font-medium text-indigo-300 border border-indigo-500/30 rounded-full px-2.5 py-1">{m.roleName}</span>
+                                        <span className="text-xs font-medium text-brand-300 border border-brand-500/30 rounded-full px-2.5 py-1">
+                                            {m.roleName}
+                                        </span>
                                     )}
                                     {canManage && (
-                                        <button
+                                        <Button
+                                            variant="danger-ghost"
+                                            size="sm"
                                             onClick={() => handleRemoveMember(m.id, m.name)}
-                                            className="text-xs text-red-400 hover:text-red-300 transition"
                                         >
                                             Remove
-                                        </button>
+                                        </Button>
                                     )}
                                 </div>
-                            </div>
+                            </Card>
                         ))}
                     </div>
                 )}
@@ -140,23 +150,26 @@ export default function MembersPage() {
             {/* Pending invites */}
             {invites.length > 0 && (
                 <section className="mb-8">
-                    <h2 className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-3">Pending Invites</h2>
+                    <SectionLabel className="mb-3">Pending Invites</SectionLabel>
                     <div className="flex flex-col gap-2">
                         {invites.map((inv) => (
-                            <div key={inv.id} className="flex items-center justify-between rounded-xl border border-yellow-500/20 bg-yellow-400/5 px-5 py-3">
+                            <Card key={inv.id} variant="warning" padding="none" className="flex items-center justify-between px-5 py-3">
                                 <div className="flex flex-col gap-0.5">
-                                    <span className="text-sm text-white">{inv.email}</span>
-                                    <span className="text-xs text-gray-400">Role: {inv.roleName} · Invited by {inv.invitedBy} · Expires {new Date(inv.expiresAt).toLocaleDateString()}</span>
+                                    <span className="text-sm text-content-primary">{inv.email}</span>
+                                    <span className="text-xs text-content-muted">
+                                        Role: {inv.roleName} · Invited by {inv.invitedBy} · Expires {new Date(inv.expiresAt).toLocaleDateString()}
+                                    </span>
                                 </div>
                                 {canManage && (
-                                    <button
+                                    <Button
+                                        variant="danger-ghost"
+                                        size="sm"
                                         onClick={() => handleRevokeInvite(inv.id, inv.email)}
-                                        className="text-xs text-red-400 hover:text-red-300 transition"
                                     >
                                         Revoke
-                                    </button>
+                                    </Button>
                                 )}
-                            </div>
+                            </Card>
                         ))}
                     </div>
                 </section>
@@ -165,82 +178,56 @@ export default function MembersPage() {
             {/* Invite form */}
             {canManage && (
                 <section>
-                    <h2 className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-3">Invite a Member</h2>
-                    <div className="rounded-2xl border border-indigo-500/20 bg-gray-900/60 p-5 max-w-lg">
+                    <SectionLabel className="mb-3">Invite a Member</SectionLabel>
+                    <Card variant="brand" className="max-w-lg">
                         <form onSubmit={handleSendInvite} className="flex flex-col gap-4">
-                            <label className="flex flex-col gap-2">
-                                <span className="text-sm font-medium text-gray-300">Email address</span>
-                                <input
+                            <FormField label="Email address">
+                                <Input
                                     type="email"
                                     value={inviteEmail}
                                     onChange={(e) => setInviteEmail(e.target.value)}
                                     placeholder="colleague@company.com"
                                     required
-                                    className="rounded-lg border border-gray-700 bg-gray-800 px-4 py-2.5 text-gray-100 outline-none ring-indigo-500 placeholder:text-gray-500 focus:ring-2"
                                 />
-                            </label>
-                            <label className="flex flex-col gap-2">
-                                <span className="text-sm font-medium text-gray-300">Role</span>
-                                <select
-                                    value={inviteRoleId}
-                                    onChange={(e) => setInviteRoleId(e.target.value)}
-                                    required
-                                    className="rounded-lg border border-gray-700 bg-gray-800 px-4 py-2.5 text-gray-200 outline-none ring-indigo-500 focus:ring-2"
-                                >
-                                    <option value="">Select a role…</option>
-                                    {roles.map((r) => (
-                                        <option key={r.id} value={r.id}>{r.name}</option>
-                                    ))}
-                                </select>
-                            </label>
+                            </FormField>
+                            <FormField label="Role">
+                                <Select<RoleOption>
+                                    options={roleOptions}
+                                    value={inviteRole}
+                                    onChange={(opt) => setInviteRole(opt)}
+                                    placeholder="Select a role…"
+                                />
+                            </FormField>
 
                             {inviteLink && (
-                                <div className="flex flex-col gap-1.5">
-                                    <span className="text-xs font-medium text-gray-400">Share this invite link:</span>
-                                    <div className="flex items-center gap-2">
-                                        <input
-                                            readOnly
-                                            value={inviteLink}
-                                            className="flex-1 rounded-lg border border-emerald-500/30 bg-emerald-400/5 px-3 py-2 text-xs text-emerald-300 outline-none"
-                                        />
-                                        <button
+                                <FormField label="Share this invite link">
+                                    <div className="flex gap-2">
+                                        <Input readOnly value={inviteLink} className="text-xs text-status-active border-status-active/30" />
+                                        <Button
                                             type="button"
+                                            variant="secondary"
+                                            size="sm"
+                                            className="shrink-0"
                                             onClick={() => { navigator.clipboard.writeText(inviteLink); toast.success("Link copied!"); }}
-                                            className="rounded-lg border border-gray-700 bg-gray-800 px-3 py-2 text-xs text-gray-300 hover:text-white transition"
                                         >
                                             Copy
-                                        </button>
+                                        </Button>
                                     </div>
-                                </div>
+                                </FormField>
                             )}
 
-                            <button
+                            <Button
                                 type="submit"
-                                disabled={isSending || !inviteEmail || !inviteRoleId}
-                                className="self-start rounded-lg bg-indigo-600 px-5 py-2 text-sm font-semibold text-white hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                                loading={isSending}
+                                disabled={!inviteEmail || !inviteRole}
+                                className="self-start"
                             >
-                                {isSending ? "Sending…" : "Send Invite"}
-                            </button>
+                                Send Invite
+                            </Button>
                         </form>
-                    </div>
+                    </Card>
                 </section>
             )}
         </PageShell>
     );
-}
-
-function PageShell({ children }: { children: React.ReactNode }) {
-    return (
-        <main className="min-h-screen bg-linear-to-br from-gray-950 via-gray-900 to-gray-950 px-4 py-10 md:px-10">
-            <div className="mx-auto w-full max-w-4xl">{children}</div>
-        </main>
-    );
-}
-
-function TabBtn({ onClick, children, variant = "default" }: { onClick: () => void; children: React.ReactNode; variant?: "default" | "ghost" }) {
-    const base = "rounded-lg px-4 py-2 text-sm font-medium transition";
-    const styles = variant === "ghost"
-        ? `${base} border border-gray-700 bg-gray-800 text-gray-400 hover:text-gray-100`
-        : `${base} border border-indigo-500/30 bg-indigo-900/30 text-indigo-300 hover:bg-indigo-800/40`;
-    return <button type="button" onClick={onClick} className={styles}>{children}</button>;
 }
