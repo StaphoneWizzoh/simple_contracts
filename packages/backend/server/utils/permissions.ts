@@ -1,22 +1,41 @@
 import { auth } from "../auth";
 import { prisma } from "../db";
 
+/**
+ * All permission keys available in the system.
+ * Permissions are stored as a JSON string array on the `OrgRole` database record.
+ */
 export const PERMISSIONS = {
+    /** Create, edit, and save contract drafts. */
     CREATE_CONTRACTS: "create_contracts",
+    /** Create and manage contract templates. */
     CREATE_TEMPLATES: "create_templates",
+    /** Be assigned as a contract reviewer. */
     REVIEW_CONTRACTS: "review_contracts",
+    /** Approve or reject contracts in the review stage. */
     APPROVE_CONTRACTS: "approve_contracts",
+    /** Send a contract to external signatories. */
     SEND_FOR_SIGNING: "send_for_signing",
+    /** Invite, remove, and reassign organisation members. */
     MANAGE_USERS: "manage_users",
+    /** Create, edit, and delete custom roles. */
     MANAGE_ROLES: "manage_roles",
+    /** Access the reporting dashboard. */
     VIEW_REPORTS: "view_reports",
+    /** Edit organisation name, legal name, and settings. */
     MANAGE_ORG: "manage_org",
 } as const;
 
+/** Union of all valid permission string values. */
 export type Permission = typeof PERMISSIONS[keyof typeof PERMISSIONS];
 
+/** Array of every permission value — used when seeding the Admin role. */
 export const ALL_PERMISSIONS: Permission[] = Object.values(PERMISSIONS);
 
+/**
+ * Default roles seeded for every new organisation.
+ * System roles cannot be deleted via the API.
+ */
 export const DEFAULT_ROLES = [
     {
         name: "Admin",
@@ -51,15 +70,31 @@ export const DEFAULT_ROLES = [
     },
 ] as const;
 
+/**
+ * Resolved context for an authenticated, org-member request.
+ * Returned by {@link getOrgContext} and {@link requirePermission}.
+ */
 export type OrgContext = {
+    /** The authenticated user's ID. */
     userId: string;
+    /** The organisation the user belongs to. */
     organizationId: string;
+    /** The user's current role ID within the organisation. */
     roleId: string;
+    /** The set of permission keys the user holds. */
     permissions: Permission[];
 };
 
+/** Minimal event shape accepted by auth/permission helpers. */
 type AppEvent = { node: { req: { headers: Record<string, string | string[] | undefined> } } };
 
+/**
+ * Verify that the request has a valid session.
+ *
+ * @param event - The Nitro/H3 event object.
+ * @returns The authenticated user.
+ * @throws 401 if no valid session is found.
+ */
 export async function requireAuth(event: AppEvent) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const session = await auth.api.getSession({ headers: event.node.req.headers as any });
@@ -69,6 +104,29 @@ export async function requireAuth(event: AppEvent) {
     return session.user;
 }
 
+/**
+ * Resolve the organisation context for the calling user.
+ *
+ * Validates that the request:
+ * 1. Has a valid Better Auth session.
+ * 2. Belongs to at least one organisation.
+ *
+ * @param event - The Nitro/H3 event object.
+ * @returns Resolved {@link OrgContext} (userId, organizationId, roleId, permissions).
+ * @throws 401 if no valid session exists.
+ * @throws 403 if the user is not a member of any organisation.
+ *
+ * @example
+ * ```ts
+ * export default defineEventHandler(async (event) => {
+ *   const ctx = await getOrgContext(event);
+ *   const contracts = await prisma.contract.findMany({
+ *     where: { organizationId: ctx.organizationId },
+ *   });
+ *   return { contracts };
+ * });
+ * ```
+ */
 export async function getOrgContext(event: AppEvent): Promise<OrgContext> {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const session = await auth.api.getSession({ headers: event.node.req.headers as any });
@@ -95,6 +153,23 @@ export async function getOrgContext(event: AppEvent): Promise<OrgContext> {
     };
 }
 
+/**
+ * Resolve the organisation context **and** assert the caller holds a specific permission.
+ *
+ * @param event - The Nitro/H3 event object.
+ * @param permission - The {@link Permission} key that must be present.
+ * @returns Resolved {@link OrgContext} if the check passes.
+ * @throws 401 if no valid session exists.
+ * @throws 403 if the user has no organisation, or lacks the required permission.
+ *
+ * @example
+ * ```ts
+ * export default defineEventHandler(async (event) => {
+ *   const ctx = await requirePermission(event, PERMISSIONS.MANAGE_ORG);
+ *   // safe to proceed — caller has manage_org
+ * });
+ * ```
+ */
 export async function requirePermission(
     event: AppEvent,
     permission: Permission,
@@ -106,6 +181,13 @@ export async function requirePermission(
     return ctx;
 }
 
+/**
+ * Create the four default system roles for a newly created organisation.
+ * Should be called immediately after `prisma.organization.create`.
+ *
+ * @param organizationId - The ID of the newly created organisation.
+ * @returns Array of created `OrgRole` records.
+ */
 export async function seedDefaultRoles(organizationId: string) {
     const roles = await Promise.all(
         DEFAULT_ROLES.map((r) =>
@@ -123,6 +205,13 @@ export async function seedDefaultRoles(organizationId: string) {
     return roles;
 }
 
+/**
+ * Retrieve the Admin role for a given organisation.
+ * Used after {@link seedDefaultRoles} to assign the creating user as Admin.
+ *
+ * @param organizationId - The organisation to look up.
+ * @returns The Admin `OrgRole` record, or `null` if not found.
+ */
 export async function getAdminRole(organizationId: string) {
     return prisma.orgRole.findFirst({
         where: { organizationId, name: "Admin" },
