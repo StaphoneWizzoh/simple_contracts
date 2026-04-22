@@ -1,0 +1,19 @@
+{
+    "name": "SimpleContracts Frontend",
+    "entryPoints": [
+        "src/components/ui/index.ts",
+        "src/store/services/authApi.ts",
+        "src/store/services/contractApi.ts",
+        "src/store/services/orgApi.ts",
+        "src/lib/cn.ts",
+        "src/lib/dayjs.ts"
+    ],
+    "entryPointStrategy": "resolve",
+    "out": "docs/html",
+    "tsconfig": "tsconfig.typedoc.json",
+    "excludePrivate": true,
+    "excludeProtected": true,
+    "excludeExternals": true,
+    "groupOrder": ["Classes", "Functions", "Interfaces", "Type Aliases", "Variables", "*"],
+    "navigationLinks": {}
+}
