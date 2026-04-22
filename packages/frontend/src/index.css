@@ -1,6 +1,57 @@
 @import "tailwindcss";
 
-/* ── Tiptap placeholder ───────────────────────────────────────────── */
+/* ── Design Tokens ─────────────────────────────────────────────────── */
+@theme {
+    /* Brand — single source of truth for the primary accent (maps to indigo) */
+    --color-brand-50:  #eef2ff;
+    --color-brand-100: #e0e7ff;
+    --color-brand-200: #c7d2fe;
+    --color-brand-300: #a5b4fc;
+    --color-brand-400: #818cf8;
+    --color-brand-500: #6366f1;
+    --color-brand-600: #4f46e5;
+    --color-brand-700: #4338ca;
+    --color-brand-800: #3730a3;
+    --color-brand-900: #312e81;
+    --color-brand-950: #1e1b4b;
+
+    /* Contract / workflow status colors */
+    --color-status-draft:       #facc15; /* yellow-400  */
+    --color-status-review:      #60a5fa; /* blue-400    */
+    --color-status-signing:     #fb923c; /* orange-400  */
+    --color-status-active:      #34d399; /* emerald-400 */
+    --color-status-expired:     #9ca3af; /* gray-400    */
+    --color-status-terminated:  #f87171; /* red-400     */
+
+    /* Semantic surface scale */
+    --color-surface-0: #030712; /* gray-950 — page background    */
+    --color-surface-1: #111827; /* gray-900 — container          */
+    --color-surface-2: #1f2937; /* gray-800 — card / input bg    */
+    --color-surface-3: #374151; /* gray-700 — separator / border */
+
+    /* Semantic text scale */
+    --color-content-primary:   #f9fafb; /* gray-50  */
+    --color-content-secondary: #d1d5db; /* gray-300 */
+    --color-content-muted:     #9ca3af; /* gray-400 */
+    --color-content-disabled:  #6b7280; /* gray-500 */
+}
+
+/* ── Global base ───────────────────────────────────────────────────── */
+@layer base {
+    *,
+    *::before,
+    *::after {
+        box-sizing: border-box;
+    }
+
+    html {
+        font-family: ui-sans-serif, system-ui, sans-serif;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+    }
+}
+
+/* ── Tiptap placeholder ────────────────────────────────────────────── */
 .tiptap p.is-editor-empty:first-child::before {
     color: #6b7280;
     content: attr(data-placeholder);
@@ -9,16 +60,14 @@
     pointer-events: none;
 }
 
-/* ── Contract prose styles ────────────────────────────────────────── */
+/* ── Contract prose styles ─────────────────────────────────────────── */
 .contract-prose {
     font-size: 0.9375rem;
     line-height: 1.75;
     color: #e5e7eb;
 }
 
-.contract-prose > * + * {
-    margin-top: 0.85rem;
-}
+.contract-prose > * + * { margin-top: 0.85rem; }
 
 .contract-prose h1 {
     font-size: 1.875rem;
@@ -52,26 +101,11 @@
     margin-top: 0.75rem;
 }
 
-.contract-prose p {
-    color: #d1d5db;
-}
-
-.contract-prose strong {
-    color: #f9fafb;
-    font-weight: 600;
-}
-
-.contract-prose em {
-    color: #e5e7eb;
-}
-
-.contract-prose u {
-    text-underline-offset: 3px;
-}
-
-.contract-prose s {
-    color: #9ca3af;
-}
+.contract-prose p    { color: #d1d5db; }
+.contract-prose strong { color: #f9fafb; font-weight: 600; }
+.contract-prose em   { color: #e5e7eb; }
+.contract-prose u    { text-underline-offset: 3px; }
+.contract-prose s    { color: #9ca3af; }
 
 .contract-prose mark {
     background-color: #fde68a;
@@ -127,9 +161,7 @@
     color: #d1d5db;
 }
 
-.contract-prose li + li {
-    margin-top: 0.25rem;
-}
+.contract-prose li + li { margin-top: 0.25rem; }
 
 .contract-prose a {
     color: #818cf8;
@@ -137,22 +169,7 @@
     text-underline-offset: 3px;
 }
 
-.contract-prose a:hover {
-    color: #a5b4fc;
-}
-
-.contract-prose sup {
-    font-size: 0.7em;
-    vertical-align: super;
-}
-
-.contract-prose sub {
-    font-size: 0.7em;
-    vertical-align: sub;
-}
-
-/* Heading select styling for dark background */
-.contract-prose select option {
-    background-color: #1c1c1e;
-    color: #e5e7eb;
-}
+.contract-prose a:hover { color: #a5b4fc; }
+.contract-prose sup { font-size: 0.7em; vertical-align: super; }
+.contract-prose sub { font-size: 0.7em; vertical-align: sub; }
+.contract-prose select option { background-color: #1c1c1e; color: #e5e7eb; }
