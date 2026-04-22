@@ -10,6 +10,10 @@ import {
     ALL_PERMISSIONS,
     type OrgRole,
 } from "@/store/services/orgApi";
+import {
+    PageShell, PageHeader, TabButton,
+    Card, Button, Input, FormField, SectionLabel, Badge, EmptyState,
+} from "@/components/ui";
 
 export default function RolesPage() {
     const navigate = useNavigate();
@@ -30,9 +34,7 @@ export default function RolesPage() {
 
     const openCreate = () => {
         setEditingRole(null);
-        setFormName("");
-        setFormDesc("");
-        setFormPerms([]);
+        setFormName(""); setFormDesc(""); setFormPerms([]);
         setShowCreate(true);
     };
 
@@ -77,81 +79,86 @@ export default function RolesPage() {
         }
     };
 
+    const tabs = (
+        <>
+            <TabButton onClick={() => navigate("/org/settings")}>Settings</TabButton>
+            <TabButton onClick={() => navigate("/org/members")}>Members</TabButton>
+            <TabButton variant="ghost" onClick={() => navigate("/contracts")}>Contracts</TabButton>
+        </>
+    );
+
     return (
-        <PageShell>
-            <header className="flex items-center justify-between mb-8">
-                <div>
-                    <p className="text-xs font-bold uppercase tracking-[0.2em] text-indigo-400">Organisation</p>
-                    <h1 className="text-2xl font-bold text-white mt-0.5">Roles & Permissions</h1>
-                </div>
-                <nav className="flex gap-2">
-                    <TabBtn onClick={() => navigate("/org/settings")}>Settings</TabBtn>
-                    <TabBtn onClick={() => navigate("/org/members")}>Members</TabBtn>
-                    <TabBtn onClick={() => navigate("/contracts")} variant="ghost">Contracts</TabBtn>
-                </nav>
-            </header>
+        <PageShell maxWidth="6xl">
+            <PageHeader eyebrow="Organisation" title="Roles & Permissions" tabs={tabs} />
 
             <div className="flex flex-col lg:flex-row gap-6">
                 {/* Roles list */}
                 <div className="flex-1 flex flex-col gap-3">
                     {isLoading ? (
-                        <p className="text-gray-400 text-sm">Loading…</p>
+                        <p className="text-sm text-content-muted">Loading…</p>
+                    ) : roles.length === 0 ? (
+                        <EmptyState title="No roles yet" action={canManage ? { label: "Create first role", onClick: openCreate } : undefined} />
                     ) : (
                         roles.map((role) => (
-                            <div
+                            <Card
                                 key={role.id}
-                                className={`rounded-xl border px-5 py-4 transition cursor-pointer ${editingRole?.id === role.id ? "border-indigo-500/60 bg-indigo-900/20" : "border-gray-700/60 bg-gray-900/60 hover:border-gray-600"}`}
+                                interactive={canManage}
                                 onClick={() => canManage ? openEdit(role) : undefined}
+                                className={editingRole?.id === role.id ? "border-brand-500/60 bg-brand-900/20" : ""}
                             >
                                 <div className="flex items-start justify-between gap-3">
                                     <div className="flex flex-col gap-1 min-w-0">
                                         <div className="flex items-center gap-2">
-                                            <span className="font-semibold text-white text-sm">{role.name}</span>
+                                            <span className="font-semibold text-content-primary text-sm">{role.name}</span>
                                             {role.isSystemRole && (
-                                                <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-400 border border-indigo-500/30 rounded-full px-2 py-0.5">System</span>
+                                                <Badge variant="brand">System</Badge>
                                             )}
                                         </div>
-                                        {role.description && <p className="text-xs text-gray-400">{role.description}</p>}
-                                        <p className="text-xs text-gray-500 mt-1">{role.memberCount ?? 0} member{role.memberCount !== 1 ? "s" : ""}</p>
+                                        {role.description && <p className="text-xs text-content-muted">{role.description}</p>}
+                                        <p className="text-xs text-content-disabled mt-1">
+                                            {role.memberCount ?? 0} member{role.memberCount !== 1 ? "s" : ""}
+                                        </p>
                                     </div>
                                     <div className="flex gap-2 shrink-0">
                                         {canManage && !role.isSystemRole && (
-                                            <button
+                                            <Button
+                                                variant="danger-ghost"
+                                                size="sm"
                                                 onClick={(e) => { e.stopPropagation(); handleDelete(role); }}
-                                                className="text-xs text-red-400 hover:text-red-300"
                                             >
                                                 Delete
-                                            </button>
+                                            </Button>
                                         )}
                                         {canManage && (
-                                            <button
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
                                                 onClick={(e) => { e.stopPropagation(); openEdit(role); }}
-                                                className="text-xs text-indigo-400 hover:text-indigo-300"
                                             >
                                                 Edit
-                                            </button>
+                                            </Button>
                                         )}
                                     </div>
                                 </div>
                                 <div className="mt-3 flex flex-wrap gap-1.5">
                                     {role.permissions.length === 0 ? (
-                                        <span className="text-xs text-gray-500 italic">No permissions (read-only)</span>
+                                        <span className="text-xs text-content-disabled italic">No permissions (read-only)</span>
                                     ) : (
                                         role.permissions.map((p) => (
-                                            <span key={p} className="text-[10px] font-medium bg-indigo-500/10 text-indigo-300 border border-indigo-500/20 rounded-full px-2 py-0.5">
+                                            <Badge key={p} variant="brand">
                                                 {ALL_PERMISSIONS.find((ap) => ap.key === p)?.label ?? p}
-                                            </span>
+                                            </Badge>
                                         ))
                                     )}
                                 </div>
-                            </div>
+                            </Card>
                         ))
                     )}
 
                     {canManage && !showCreate && !editingRole && (
                         <button
                             onClick={openCreate}
-                            className="rounded-xl border border-dashed border-gray-700 px-5 py-4 text-sm text-gray-400 hover:border-indigo-500/50 hover:text-indigo-300 transition text-left"
+                            className="rounded-2xl border border-dashed border-gray-700 px-5 py-4 text-sm text-content-muted hover:border-brand-500/50 hover:text-brand-300 transition text-left"
                         >
                             + Create custom role
                         </button>
@@ -161,84 +168,67 @@ export default function RolesPage() {
                 {/* Create / Edit panel */}
                 {canManage && (showCreate || editingRole) && (
                     <div className="w-full lg:w-80 shrink-0">
-                        <div className="rounded-2xl border border-indigo-500/20 bg-gray-900/60 p-5">
-                            <h3 className="text-sm font-bold text-white mb-4">
+                        <Card variant="brand">
+                            <h3 className="text-sm font-bold text-content-primary mb-4">
                                 {editingRole ? `Edit "${editingRole.name}"` : "New Role"}
                             </h3>
                             <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-                                <label className="flex flex-col gap-1.5">
-                                    <span className="text-xs font-medium text-gray-300">Name *</span>
-                                    <input
+                                <FormField label="Name" required>
+                                    <Input
                                         value={formName}
                                         onChange={(e) => setFormName(e.target.value)}
                                         placeholder="e.g. Legal Manager"
                                         required
-                                        className="rounded-lg border border-gray-700 bg-gray-800 px-3 py-2 text-sm text-gray-100 outline-none ring-indigo-500 focus:ring-2"
                                     />
-                                </label>
-                                <label className="flex flex-col gap-1.5">
-                                    <span className="text-xs font-medium text-gray-300">Description</span>
-                                    <input
+                                </FormField>
+                                <FormField label="Description">
+                                    <Input
                                         value={formDesc}
                                         onChange={(e) => setFormDesc(e.target.value)}
                                         placeholder="Optional description"
-                                        className="rounded-lg border border-gray-700 bg-gray-800 px-3 py-2 text-sm text-gray-100 outline-none ring-indigo-500 focus:ring-2"
                                     />
-                                </label>
+                                </FormField>
                                 <div className="flex flex-col gap-2">
-                                    <span className="text-xs font-medium text-gray-300">Permissions</span>
-                                    <div className="flex flex-col gap-2">
+                                    <SectionLabel>Permissions</SectionLabel>
+                                    <div className="flex flex-col gap-2 mt-1">
                                         {ALL_PERMISSIONS.map((p) => (
                                             <label key={p.key} className="flex items-center gap-2.5 cursor-pointer group">
                                                 <input
                                                     type="checkbox"
                                                     checked={formPerms.includes(p.key)}
                                                     onChange={() => togglePerm(p.key)}
-                                                    className="rounded border-gray-600 bg-gray-800 text-indigo-500 focus:ring-indigo-500"
+                                                    className="rounded border-gray-600 bg-surface-2 text-brand-500 focus:ring-brand-500"
                                                 />
-                                                <span className="text-xs text-gray-300 group-hover:text-white transition">{p.label}</span>
+                                                <span className="text-xs text-content-secondary group-hover:text-content-primary transition">
+                                                    {p.label}
+                                                </span>
                                             </label>
                                         ))}
                                     </div>
                                 </div>
 
-                                <div className="flex gap-2">
-                                    <button
+                                <div className="flex gap-2 pt-1">
+                                    <Button
                                         type="submit"
-                                        disabled={isCreating || isUpdating || !formName.trim()}
-                                        className="flex-1 rounded-lg bg-indigo-600 py-2 text-sm font-semibold text-white hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                                        loading={isCreating || isUpdating}
+                                        disabled={!formName.trim()}
+                                        className="flex-1"
                                     >
-                                        {isCreating || isUpdating ? "Saving…" : editingRole ? "Update" : "Create"}
-                                    </button>
-                                    <button
+                                        {editingRole ? "Update" : "Create"}
+                                    </Button>
+                                    <Button
                                         type="button"
+                                        variant="secondary"
                                         onClick={() => { setEditingRole(null); setShowCreate(false); }}
-                                        className="rounded-lg border border-gray-700 bg-gray-800 px-3 py-2 text-sm text-gray-400 hover:text-gray-100"
                                     >
                                         Cancel
-                                    </button>
+                                    </Button>
                                 </div>
                             </form>
-                        </div>
+                        </Card>
                     </div>
                 )}
             </div>
         </PageShell>
     );
-}
-
-function PageShell({ children }: { children: React.ReactNode }) {
-    return (
-        <main className="min-h-screen bg-linear-to-br from-gray-950 via-gray-900 to-gray-950 px-4 py-10 md:px-10">
-            <div className="mx-auto w-full max-w-5xl">{children}</div>
-        </main>
-    );
-}
-
-function TabBtn({ onClick, children, variant = "default" }: { onClick: () => void; children: React.ReactNode; variant?: "default" | "ghost" }) {
-    const base = "rounded-lg px-4 py-2 text-sm font-medium transition";
-    const styles = variant === "ghost"
-        ? `${base} border border-gray-700 bg-gray-800 text-gray-400 hover:text-gray-100`
-        : `${base} border border-indigo-500/30 bg-indigo-900/30 text-indigo-300 hover:bg-indigo-800/40`;
-    return <button type="button" onClick={onClick} className={styles}>{children}</button>;
 }
