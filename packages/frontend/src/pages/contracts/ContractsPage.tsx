@@ -2,11 +2,23 @@ import { useNavigate } from "react-router-dom";
 import { useGetCurrentUserQuery } from "@/store/services/authApi";
 import { useGetContractsQuery } from "@/store/services/contractApi";
 
+const STATUS_LABEL: Record<string, string> = {
+    DRAFT: "Draft",
+    REVIEW: "In Review",
+    SENT_FOR_SIGNING: "Sent for Signing",
+    ACTIVE: "Active",
+    EXPIRED: "Expired",
+    TERMINATED: "Terminated",
+};
+
 function statusColor(status: string) {
     switch (status) {
         case "DRAFT": return "text-yellow-400 bg-yellow-400/10 border-yellow-400/30";
         case "REVIEW": return "text-blue-400 bg-blue-400/10 border-blue-400/30";
-        case "EXECUTED": return "text-emerald-400 bg-emerald-400/10 border-emerald-400/30";
+        case "SENT_FOR_SIGNING": return "text-violet-400 bg-violet-400/10 border-violet-400/30";
+        case "ACTIVE": return "text-emerald-400 bg-emerald-400/10 border-emerald-400/30";
+        case "EXPIRED": return "text-gray-400 bg-gray-400/10 border-gray-400/30";
+        case "TERMINATED": return "text-red-400 bg-red-400/10 border-red-400/30";
         default: return "text-gray-400 bg-gray-400/10 border-gray-400/30";
     }
 }
@@ -118,7 +130,7 @@ export default function ContractsPage() {
                                     </div>
                                     <div className="flex items-center gap-3 shrink-0">
                                         <span className={`text-xs font-semibold px-2.5 py-1 rounded-full border ${statusColor(c.status)}`}>
-                                            {c.status}
+                                            {STATUS_LABEL[c.status] ?? c.status}
                                         </span>
                                         <span className="text-xs text-gray-500">v{c.versionNumber}</span>
                                     </div>
