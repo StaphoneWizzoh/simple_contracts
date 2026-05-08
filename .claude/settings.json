@@ -1,0 +1,43 @@
+{
+    "mcpServers": {
+        "context7": {
+            "command": "npx",
+            "args": ["-y", "@upstash/context7-mcp"]
+        }
+    },
+    "model": "haiku",
+    "hooks": {
+        "SessionStart": [
+            {
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "echo '## Git' && git branch --show-current && git status --short | head -10"
+                    }
+                ]
+            }
+        ]
+    },
+    "extraKnownMarketplaces": {
+        "knowledge-work-plugins": {
+            "source": {
+                "source": "github",
+                "repo": "anthropics/knowledge-work-plugins"
+            }
+        },
+        "claude-code-plugins": {
+            "source": {
+                "source": "github",
+                "repo": "anthropics/claude-code"
+            }
+        },
+        "claude-plugins-official": {
+            "source": {
+                "source": "git",
+                "url": "https://github.com/anthropics/claude-plugins-official.git"
+            }
+        }
+    },
+    "effortLevel": "medium",
+    "autoUpdatesChannel": "latest"
+}
