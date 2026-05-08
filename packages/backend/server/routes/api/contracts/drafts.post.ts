@@ -1,14 +1,7 @@
 import { auth } from "../../../auth";
 import { prisma } from "../../../db";
 import { seedDefaultRoles, getAdminRole, PERMISSIONS, getOrgContext } from "../../../utils/permissions";
-
-type SaveDraftBody = {
-    contractId?: string;
-    title?: string;
-    description?: string;
-    counterpartyName?: string;
-    contentHtml?: string;
-};
+import type { SaveDraftBody } from "../../../types/contracts";
 
 function createContractNumber() {
     return `CNT-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
