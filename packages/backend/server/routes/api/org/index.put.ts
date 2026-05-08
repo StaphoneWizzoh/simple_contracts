@@ -1,9 +1,10 @@
 import { prisma } from "../../../db";
 import { requirePermission, PERMISSIONS } from "../../../utils/permissions";
+import type { UpdateOrgBody } from "../../../types/org";
 
 export default defineEventHandler(async (event) => {
     const ctx = await requirePermission(event, PERMISSIONS.MANAGE_ORG);
-    const body = await readBody(event) as { name?: string; legalName?: string; logoUrl?: string };
+    const body = await readBody(event) as UpdateOrgBody;
 
     if (!body?.name?.trim()) {
         throw createError({ statusCode: 400, statusMessage: "Organisation name is required" });
