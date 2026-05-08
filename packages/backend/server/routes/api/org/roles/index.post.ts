@@ -1,9 +1,10 @@
 import { prisma } from "../../../../db";
 import { requirePermission, PERMISSIONS, ALL_PERMISSIONS } from "../../../../utils/permissions";
+import type { CreateRoleBody } from "../../../../types/org";
 
 export default defineEventHandler(async (event) => {
     const ctx = await requirePermission(event, PERMISSIONS.MANAGE_ROLES);
-    const body = await readBody(event) as { name?: string; description?: string; permissions?: string[] };
+    const body = await readBody(event) as CreateRoleBody;
 
     if (!body?.name?.trim()) throw createError({ statusCode: 400, statusMessage: "Role name is required" });
 
