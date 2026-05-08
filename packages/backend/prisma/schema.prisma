@@ -29,6 +29,7 @@ model User {
   signatureActions        ContractSignature[]  @relation("SignatureActor")
   auditEvents             ContractAuditLog[]   @relation("AuditActor")
   sentInvites             OrgInvite[]          @relation("SentInvites")
+  contractApprovals       ContractApproval[]   @relation("ContractApprovals")
 }
 
 model Account {
@@ -143,24 +144,29 @@ model OrgInvite {
 }
 
 model Contract {
-  id               String    @id @default(cuid())
-  organizationId   String
-  ownerUserId      String
-  createdByUserId  String
-  contractNumber   String
-  title            String
-  description      String?
-  contractType     String    @default("OTHER")
-  status           String    @default("DRAFT")
-  counterpartyName String?
-  effectiveAt      DateTime?
-  expiresAt        DateTime?
-  terminatedAt     DateTime?
-  currencyCode     String    @default("USD")
-  totalValueMinor  Int?
-  currentVersionId String?   @unique
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
+  id                    String    @id @default(cuid())
+  organizationId        String
+  ownerUserId           String
+  createdByUserId       String
+  contractNumber        String
+  title                 String
+  description           String?
+  contractType          String    @default("OTHER")
+  status                String    @default("DRAFT")
+  counterpartyName      String?
+  effectiveAt           DateTime?
+  expiresAt             DateTime?
+  terminatedAt          DateTime?
+  terminationReason     String?
+  currencyCode          String    @default("USD")
+  totalValueMinor       Int?
+  approvalWorkflow      String    @default("SIMULTANEOUS")
+  signingWorkflow       String    @default("SIMULTANEOUS")
+  signatureType         String    @default("BOTH")
+  signingLinkExpiryDays Int       @default(14)
+  currentVersionId      String?   @unique
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
 
   organization   Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   ownerUser      User                @relation("ContractOwner", fields: [ownerUserId], references: [id], onDelete: Restrict)
@@ -170,6 +176,7 @@ model Contract {
   parties        ContractParty[]
   signatures     ContractSignature[]
   auditLogs      ContractAuditLog[]
+  approvals      ContractApproval[]
 
   @@unique([organizationId, contractNumber])
   @@index([organizationId, status])
@@ -256,4 +263,23 @@ model ContractAuditLog {
   @@index([contractId, createdAt])
   @@index([actorUserId])
   @@index([eventType])
+}
+
+model ContractApproval {
+  id         String    @id @default(cuid())
+  contractId String
+  approverId String
+  order      Int       @default(0)
+  status     String    @default("PENDING")
+  comment    String?
+  actedAt    DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  contract Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  approver User     @relation("ContractApprovals", fields: [approverId], references: [id], onDelete: Cascade)
+
+  @@unique([contractId, approverId])
+  @@index([contractId, status])
+  @@index([approverId])
 }
