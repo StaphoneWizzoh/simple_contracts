@@ -1,6 +1,6 @@
 # SimpleContracts
 
-A multi-tenant SaaS contract management platform for organisations and businesses. Draft, review, sign, and manage contracts through a structured lifecycle with role-based access control, e-signatures, and a full audit trail.
+A multi-tenant SaaS contract management platform for organisations and businesses. Draft, review, approve, sign, and manage contracts through a structured lifecycle with role-based access control, e-signatures, and a full audit trail.
 
 ---
 
@@ -8,17 +8,10 @@ A multi-tenant SaaS contract management platform for organisations and businesse
 
 Generated API documentation is available for each package. Run `npm run docs` from the project root to regenerate after code changes.
 
-Two formats are produced per package:
-
 | Package | GitHub (Markdown) | Hosted (HTML) |
 |---|---|---|
 | **Frontend** | [packages/frontend/docs/](./packages/frontend/docs/README.md) | _Replace with hosted URL_ |
-| **Backend** | [packages/backend/docs/](./packages/backend/docs/README.md) | _Replace with hosted URL_ |
-
-- **Markdown** (`docs/`) — rendered directly by GitHub, linked above.
-- **HTML** (`docs/html/`) — full interactive site suitable for GitHub Pages, Netlify, or Vercel. Point the hosted URL placeholders above at your deployed site once set up.
-
-> To deploy the HTML docs, push the `docs/html/` folder from either package to your static host of choice, or configure GitHub Pages to serve from that path.
+| **Backend** | [packages/backend/docs/](./docs/README.md) | _Replace with hosted URL_ |
 
 ---
 
@@ -26,17 +19,17 @@ Two formats are produced per package:
 
 | Layer | Technology |
 |---|---|
-| **Frontend** | React 18, Vite, TypeScript |
+| **Frontend** | React 18, Vite 5, TypeScript |
 | **State / Data fetching** | Redux Toolkit, RTK Query |
 | **Styling** | Tailwind CSS v4, Sonner (toasts) |
 | **Rich text editor** | Tiptap v3 |
 | **PDF export** | @react-pdf/renderer |
 | **Component selects** | react-select |
 | **Date handling** | dayjs |
-| **Backend** | Nitro (h3), TypeScript |
-| **Database ORM** | Prisma |
+| **Backend** | Nitro 2 (h3), TypeScript |
+| **Database ORM** | Prisma 5 |
 | **Database** | SQLite (dev) |
-| **Authentication** | Better Auth |
+| **Authentication** | Better Auth 1.6 |
 | **Monorepo** | npm workspaces |
 
 ---
@@ -44,35 +37,40 @@ Two formats are produced per package:
 ## Architecture Overview
 
 ```
-┌──────────────────────────────────────────────────────────┐
-│                     Browser (React SPA)                   │
-│  Vite dev server :5173  →  proxies /api and /auth         │
-│                                                           │
-│  Redux Store                                              │
-│    ├── authApi      (RTK Query — /auth/*)                 │
-│    ├── contractApi  (RTK Query — /api/contracts/*)        │
-│    └── orgApi       (RTK Query — /api/org/*)              │
-└──────────────────────────────┬───────────────────────────┘
+┌──────────────────────────────────────────────────────────────┐
+│                      Browser (React SPA)                      │
+│  Vite dev server :5173  →  proxies /api and /auth             │
+│                                                               │
+│  Redux Store                                                  │
+│    ├── authApi      (RTK Query — /auth/*)                     │
+│    ├── contractApi  (RTK Query — /api/contracts/*)            │
+│    └── orgApi       (RTK Query — /api/org/*)                  │
+└──────────────────────────────┬────────────────────────────────┘
                                │ HTTP (proxied in dev)
-┌──────────────────────────────▼───────────────────────────┐
-│                   Nitro Backend :3000                     │
-│                                                           │
-│  /auth/**       →  Better Auth handler                   │
-│  /api/user      →  current session user                  │
-│  /api/contracts →  contract CRUD + publish               │
-│  /api/org/**    →  org, members, roles, invites          │
-│  /api/invites   →  public invite accept flow             │
-│                                                           │
-│  Middleware:  getOrgContext / requirePermission           │
-└──────────────────────────────┬───────────────────────────┘
+┌──────────────────────────────▼────────────────────────────────┐
+│                    Nitro Backend :3000                         │
+│                                                               │
+│  /auth/**                →  Better Auth handler               │
+│  /api/contracts          →  list + CRUD                       │
+│  /api/contracts/:id      →  detail + settings                 │
+│  /api/contracts/:id/*    →  lifecycle actions (see routes)    │
+│  /api/org/**             →  org, members, roles, invites      │
+│  /api/invites/**         →  public invite accept flow         │
+│                                                               │
+│  Plugins (run at startup):                                    │
+│    expire-contracts      →  hourly auto-expire cron           │
+│                                                               │
+│  Middleware:  getOrgContext / requirePermission               │
+│  Utilities:  assertTransition (status machine)               │
+└──────────────────────────────┬────────────────────────────────┘
                                │ Prisma Client
-┌──────────────────────────────▼───────────────────────────┐
-│                   SQLite Database                         │
-│  User, Account, Session, Organization, OrgRole,          │
-│  OrganizationMember, OrgInvite, Contract,                │
-│  ContractVersion, ContractParty, ContractSignature,      │
-│  ContractAuditLog                                        │
-└──────────────────────────────────────────────────────────┘
+┌──────────────────────────────▼────────────────────────────────┐
+│                      SQLite Database                           │
+│  User, Account, Session, Organization, OrgRole,               │
+│  OrganizationMember, OrgInvite, Contract, ContractVersion,    │
+│  ContractParty, ContractSignature, ContractAuditLog,          │
+│  ContractApproval                                             │
+└───────────────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -144,38 +142,57 @@ simple_contracts/
 ├── packages/
 │   ├── backend/
 │   │   ├── prisma/
-│   │   │   ├── schema.prisma       # Database schema
-│   │   │   └── migrations/         # Prisma migration history
-│   │   ├── server/
-│   │   │   ├── auth.ts             # Better Auth configuration
-│   │   │   ├── db.ts               # Prisma client singleton
-│   │   │   ├── routes/
-│   │   │   │   ├── api/
-│   │   │   │   │   ├── contracts/  # Contract CRUD endpoints
-│   │   │   │   │   ├── org/        # Org, member, role, invite endpoints
-│   │   │   │   │   └── invites/    # Public invite accept endpoints
-│   │   │   │   └── auth/           # Better Auth catch-all handler
-│   │   │   └── utils/
-│   │   │       └── permissions.ts  # RBAC middleware (getOrgContext, requirePermission)
-│   │   └── nitro.config.ts
+│   │   │   ├── schema.prisma            # Database schema (single source of truth)
+│   │   │   └── migrations/              # Prisma migration history
+│   │   └── server/
+│   │       ├── auth.ts                  # Better Auth configuration
+│   │       ├── db.ts                    # Prisma client singleton
+│   │       ├── plugins/
+│   │       │   └── expire-contracts.ts  # Hourly auto-expire for ACTIVE contracts
+│   │       ├── utils/
+│   │       │   ├── permissions.ts       # RBAC: getOrgContext, requirePermission
+│   │       │   └── contractStatus.ts    # Status machine: assertTransition
+│   │       └── routes/api/
+│   │           ├── contracts/
+│   │           │   ├── index.get.ts     # List all org contracts
+│   │           │   ├── [id].get.ts      # Contract detail + settings
+│   │           │   ├── drafts.post.ts   # Save/update a draft
+│   │           │   ├── publish.post.ts  # DRAFT → REVIEW
+│   │           │   └── [id]/
+│   │           │       ├── approvals.get.ts       # List approvers + status
+│   │           │       ├── audit.get.ts           # Full audit trail
+│   │           │       ├── reviewers.post.ts      # Assign approvers
+│   │           │       ├── approve.post.ts        # Approver acts: APPROVED
+│   │           │       ├── reject.post.ts         # Approver acts: REJECTED → DRAFT
+│   │           │       ├── send-for-signing.post.ts  # REVIEW → SENT_FOR_SIGNING
+│   │           │       ├── terminate.post.ts      # ACTIVE → TERMINATED
+│   │           │       └── settings.patch.ts      # Update contract settings
+│   │           └── org/                 # Org, member, role, invite endpoints
 │   │
-│   └── frontend/
-│       └── src/
-│           ├── components/
-│           │   ├── ui/             # Design system components (Button, Input, Select …)
-│           │   ├── contracts/      # Contract editor + PDF document
-│           │   └── ProtectedRoute.tsx
-│           ├── config/routes/      # React Router v6 route configs
-│           ├── lib/
-│           │   ├── cn.ts           # Class name utility
-│           │   └── dayjs.ts        # Date helpers (formatDate, fromNow …)
-│           ├── pages/              # Page components (auth, contracts, org, invites)
-│           └── store/
-│               └── services/       # RTK Query API slices
+│   └── frontend/src/
+│       ├── components/
+│       │   ├── ui/                      # Design system (Button, Input, Badge …)
+│       │   ├── contracts/
+│       │   │   ├── ContractEditor.tsx         # TipTap rich-text editor
+│       │   │   ├── ContractPdfDocument.tsx    # @react-pdf/renderer template
+│       │   │   ├── ContractSettingsPanel.tsx  # Type/dates/value/workflow settings
+│       │   │   └── ContractApprovalPanel.tsx  # Reviewer assignment + approve/reject UI
+│       │   └── ProtectedRoute.tsx
+│       ├── config/routes/               # File-split React Router v6 route configs
+│       ├── pages/
+│       │   ├── contracts/
+│       │   │   ├── ContractsPage.tsx    # Contract list with status badges
+│       │   │   └── ContractEditorPage.tsx  # Status-aware editor/viewer page
+│       │   ├── org/                     # Onboarding, Settings, Members, Roles
+│       │   ├── auth/                    # Login, Signup
+│       │   └── invites/                 # Accept invite page
+│       └── store/services/
+│           ├── contractApi.ts           # All contract RTK Query endpoints + types
+│           ├── orgApi.ts                # Org/members/roles/invites RTK Query
+│           └── authApi.ts              # Auth RTK Query
 │
-├── TASKS.md                        # Phase-by-phase build roadmap
-├── USER_TESTING.md                 # QA and client testing guide
-└── README.md                       # This file
+├── TASKS.md                             # Phase-by-phase build roadmap
+└── README.md                            # This file
 ```
 
 ---
@@ -188,28 +205,63 @@ Every user belongs to one organisation. Within that org they are assigned an `Or
 
 | Permission key | Description |
 |---|---|
-| `create_contracts` | Draft and edit contracts |
+| `create_contracts` | Draft, edit, and submit contracts for review |
 | `create_templates` | Create and manage contract templates |
-| `review_contracts` | Be assigned as a reviewer |
-| `approve_contracts` | Approve or reject contracts |
-| `send_for_signing` | Send a contract out for e-signature |
+| `review_contracts` | Be assigned as a contract reviewer |
+| `approve_contracts` | Approve or reject contracts; assign reviewers |
+| `send_for_signing` | Send approved contracts out for e-signature |
 | `manage_users` | Invite, remove, and reassign members |
-| `manage_roles` | Create and edit roles |
+| `manage_roles` | Create and edit custom roles |
 | `view_reports` | Access the reporting dashboard |
-| `manage_org` | Edit organisation settings |
+| `manage_org` | Edit organisation settings; terminate active contracts |
 
 Four system roles are seeded for every new organisation: **Admin**, **Contract Manager**, **Contract Creator**, **Viewer**.
 
-All API routes are guarded by `getOrgContext(event)` (membership check) or `requirePermission(event, permission)` (permission check). See [backend docs](./packages/backend/docs/README.md) for details.
+All API routes are guarded by `getOrgContext(event)` (membership check) or `requirePermission(event, permission)` (permission + membership check).
 
 ### Contract Lifecycle
 
+Contracts flow through a strict state machine. Backward transitions (except rejection) are blocked server-side by `assertTransition()`.
+
 ```
-DRAFT → REVIEW → SENT_FOR_SIGNING → ACTIVE → EXPIRED
-                                           ↘ TERMINATED
+                    ┌─── rejection ───┐
+                    ▼                 │
+DRAFT  →  REVIEW  →  SENT_FOR_SIGNING  →  ACTIVE  →  EXPIRED (auto, hourly)
+                                                  ↘  TERMINATED (manual)
 ```
 
-Status transitions are validated server-side. Backward transitions (except `REVIEW → DRAFT` on rejection) are blocked.
+| Transition | Triggered by | Permission required |
+|---|---|---|
+| `DRAFT → REVIEW` | "Submit for Review" | `create_contracts` |
+| `REVIEW → DRAFT` | Approval rejection | assigned approver or `approve_contracts` |
+| `REVIEW → SENT_FOR_SIGNING` | "Send for Signing" | `send_for_signing` (all approvals must be done) |
+| `SENT_FOR_SIGNING → ACTIVE` | All signatories sign | _Phase 4 — automated_ |
+| `ACTIVE → EXPIRED` | Hourly background job | automatic (when `expiresAt` is past) |
+| `ACTIVE → TERMINATED` | Manual termination | `manage_org` |
+
+### Review & Approval Workflow
+
+When a contract is in `REVIEW` status, users with `approve_contracts` can assign approvers from org members. Two workflow modes are supported:
+
+- **Simultaneous** — all assigned approvers can act in any order
+- **Sequential** — approvers must act in the assigned order (0, 1, 2…); an approver is blocked until everyone before them has approved
+
+Once all approvals are complete (or if none were required), a user with `send_for_signing` can advance the contract to `SENT_FOR_SIGNING`. Any rejection by an assigned approver immediately moves the contract back to `DRAFT` and cancels all other pending approvals.
+
+### Contract Settings
+
+Per-contract settings can be configured in `DRAFT` or `REVIEW` status:
+
+| Setting | Values |
+|---|---|
+| Contract type | NDA, Service Agreement, Employment, Consulting, Lease, Purchase, Partnership, Other |
+| Effective date | Date |
+| Expiry date | Date — triggers auto-expire when passed |
+| Contract value | Decimal amount + currency code |
+| Approval workflow | Simultaneous / Sequential |
+| Signing order | Simultaneous / Sequential |
+| Signature type | Typed / Drawn / Either |
+| Signing link expiry | 7 / 14 / 30 / 60 days |
 
 ### Frontend Route Guards
 
@@ -224,8 +276,6 @@ Status transitions are validated server-side. Backward transitions (except `REVI
 
 ### Authentication (`/auth/*`)
 
-Handled by Better Auth. Key endpoints:
-
 | Method | Path | Description |
 |---|---|---|
 | `POST` | `/auth/sign-up/email` | Register a new user |
@@ -235,78 +285,65 @@ Handled by Better Auth. Key endpoints:
 
 ### Contracts (`/api/contracts/*`)
 
-| Method | Path | Permission required | Description |
+| Method | Path | Permission | Description |
 |---|---|---|---|
 | `GET` | `/api/contracts` | org member | List all contracts in the org |
-| `GET` | `/api/contracts/:id` | org member | Get a single contract |
+| `GET` | `/api/contracts/:id` | org member | Full contract detail + settings |
 | `POST` | `/api/contracts/drafts` | `create_contracts` | Save or update a draft |
-| `POST` | `/api/contracts/publish` | `create_contracts` | Move draft → review |
+| `POST` | `/api/contracts/publish` | `create_contracts` | Move `DRAFT → REVIEW` |
+| `PATCH` | `/api/contracts/:id/settings` | `create_contracts` | Update contract type, dates, value, workflow settings |
+| `GET` | `/api/contracts/:id/approvals` | org member | List assigned approvers and their status |
+| `GET` | `/api/contracts/:id/audit` | org member | Full chronological audit trail |
+| `POST` | `/api/contracts/:id/reviewers` | `approve_contracts` | Assign/replace approvers + set workflow mode |
+| `POST` | `/api/contracts/:id/approve` | assigned approver | Submit an approval (with optional comment) |
+| `POST` | `/api/contracts/:id/reject` | assigned approver or `approve_contracts` | Reject → contract returns to `DRAFT` |
+| `POST` | `/api/contracts/:id/send-for-signing` | `send_for_signing` | Advance `REVIEW → SENT_FOR_SIGNING` |
+| `POST` | `/api/contracts/:id/terminate` | `manage_org` | Terminate an active contract with optional reason |
 
 ### Organisation (`/api/org/*`)
 
 | Method | Path | Permission | Description |
 |---|---|---|---|
-| `GET` | `/api/org` | org member | Get org details + caller's permissions |
+| `GET` | `/api/org` | org member | Org details + caller's permissions |
 | `POST` | `/api/org` | auth only | Create an org (onboarding) |
 | `PUT` | `/api/org` | `manage_org` | Update org name / legal name |
 | `GET` | `/api/org/members` | org member | List all members |
 | `PUT` | `/api/org/members/:id` | `manage_users` | Change a member's role |
 | `DELETE` | `/api/org/members/:id` | `manage_users` | Remove a member |
-| `GET` | `/api/org/roles` | org member | List all roles (with member counts) |
+| `GET` | `/api/org/roles` | org member | List all roles |
 | `POST` | `/api/org/roles` | `manage_roles` | Create a custom role |
 | `PUT` | `/api/org/roles/:id` | `manage_roles` | Update a role |
 | `DELETE` | `/api/org/roles/:id` | `manage_roles` | Delete a custom role |
 | `GET` | `/api/org/invites` | `manage_users` | List pending invites |
-| `POST` | `/api/org/invites` | `manage_users` | Send an invite email/link |
+| `POST` | `/api/org/invites` | `manage_users` | Send an invite |
 | `DELETE` | `/api/org/invites/:id` | `manage_users` | Revoke an invite |
 
 ### Invites (public)
 
 | Method | Path | Auth | Description |
 |---|---|---|---|
-| `GET` | `/api/invites/:token` | none | Validate invite token (returns details) |
+| `GET` | `/api/invites/:token` | none | Validate invite token (returns org + role details) |
 | `POST` | `/api/invites/:token/accept` | required | Accept invite and join org |
 
 ---
 
-## Design System
+## Database Schema
 
-The frontend ships a component library at `src/components/ui/` built on Tailwind CSS v4 design tokens.
+Key models and their purpose:
 
-### Tokens (defined in `src/index.css` `@theme` block)
-
-| Token group | Example class | Purpose |
-|---|---|---|
-| `brand-{50..950}` | `bg-brand-600` | Primary accent (indigo — swap to rebrand) |
-| `status-{draft,review,signing,active,expired,terminated}` | `text-status-draft` | Contract lifecycle colours |
-| `surface-{0,1,2,3}` | `bg-surface-1` | Background scale |
-| `content-{primary,secondary,muted,disabled}` | `text-content-muted` | Text scale |
-
-### Components
-
-Import from `@/components/ui`:
-
-```tsx
-import { Button, Input, Select, Card, Badge, StatusBadge,
-         FormField, PageShell, PageHeader, EmptyState } from "@/components/ui";
-```
-
-See [frontend docs](./packages/frontend/docs/README.md) for full component API.
-
----
-
-## Generating Documentation
-
-```bash
-# Generate docs for both packages
-npm run docs
-
-# Or per package
-npm run docs -w packages/frontend
-npm run docs -w packages/backend
-```
-
-Output is written to `packages/frontend/docs/` and `packages/backend/docs/`. Commit these folders only if you are **not** using a CI-generated hosted docs site.
+| Model | Purpose |
+|---|---|
+| `User` | Auth identity (managed by Better Auth) |
+| `Organization` | Top-level tenant |
+| `OrgRole` | Org-scoped role with JSON permissions array |
+| `OrganizationMember` | User ↔ Org membership with assigned role |
+| `OrgInvite` | Time-limited email invite tokens |
+| `Contract` | Core contract record — status, settings, ownership |
+| `ContractVersion` | Immutable content snapshots (HTML + text + JSON) |
+| `ContractParty` | External signatories (no app account required) |
+| `ContractSignature` | Per-party signing status and metadata |
+| `ContractApproval` | Per-approver approval record (order, status, comment) |
+| `ContractAuditLog` | Immutable event log for every contract action |
 
 ---
 
@@ -315,12 +352,12 @@ Output is written to `packages/frontend/docs/` and `packages/backend/docs/`. Com
 | Script | Description |
 |---|---|
 | `npm run dev` | Start both servers concurrently |
-| `npm run dev:backend` | Backend only |
-| `npm run dev:frontend` | Frontend only |
+| `npm run dev:backend` | Backend only (port 3000) |
+| `npm run dev:frontend` | Frontend only (port 5173) |
 | `npm run build` | Production build for all packages |
 | `npm run health` | Ping both backend and proxy health checks |
 | `npm run docs` | Generate API docs for all packages |
-| `npm run db:migrate -w packages/backend` | Run Prisma migrations |
+| `npm run db:migrate -w packages/backend` | Apply Prisma migrations |
 | `npm run db:studio -w packages/backend` | Open Prisma Studio |
 
 ---
@@ -329,10 +366,10 @@ Output is written to `packages/frontend/docs/` and `packages/backend/docs/`. Com
 
 | Variable | Package | Required | Description |
 |---|---|---|---|
-| `DATABASE_URL` | backend | ✅ | Prisma database connection string |
+| `DATABASE_URL` | backend | ✅ | Prisma connection string (`file:./dev.db` for SQLite) |
 | `BETTER_AUTH_SECRET` | backend | ✅ | Session signing secret (≥ 32 chars in production) |
 | `BETTER_AUTH_URL` | backend | ✅ | Backend base URL |
-| `BETTER_AUTH_TRUSTED_ORIGINS` | backend | ✅ | Comma-separated list of allowed frontend origins |
+| `BETTER_AUTH_TRUSTED_ORIGINS` | backend | ✅ | Comma-separated allowed frontend origins |
 
 ---
 
@@ -340,10 +377,9 @@ Output is written to `packages/frontend/docs/` and `packages/backend/docs/`. Com
 
 ```bash
 npm run build
-npm run preview -w packages/backend
 ```
 
-Deploy `packages/frontend/dist/` to any static host. Configure it to rewrite all routes to `index.html` for SPA routing.
+Deploy `packages/frontend/dist/` to any static host. Configure it to rewrite all routes to `index.html` for SPA routing. The backend output is in `packages/backend/.output/`.
 
 ---
 
@@ -353,19 +389,21 @@ See [TASKS.md](./TASKS.md) for the full phase-by-phase feature roadmap.
 
 | Phase | Status | Description |
 |---|---|---|
-| 1 — Multi-tenancy & RBAC | ✅ Done | Org setup, roles, invites, route guards |
-| 2 — Contract Lifecycle | 🔲 Next | Status machine, review & approval workflow |
-| 3 — Templates | 🔲 Pending | Template CRUD, placeholder filling |
-| 4 — E-Signatures | 🔲 Pending | Signatory management, secure signing links |
-| 5 — PDF Export | ✅ Done | Contract PDF with content + signature block |
-| 6 — Search & Reporting | 🔲 Pending | Full-text search, dashboard reports |
+| 1 — Multi-tenancy & RBAC | ✅ Done | Org setup, custom roles, invite flow, route guards |
+| 2 — Contract Lifecycle & Workflow | ✅ Done | Status machine, approval workflow, settings panel, auto-expire |
+| 3 — Contract Templates | 🔲 Next | Template CRUD, variable placeholders, "create from template" flow |
+| 4 — E-Signatures | 🔲 Pending | Signatory management, secure signing links, public signing page |
+| 5 — PDF Export | 🟡 Partial | Contract PDF done; signature block + audit summary pending Phase 4 |
+| 6 — Search & Reporting | 🔲 Pending | Full-text search, dashboard reports, CSV/PDF export |
+| 7 — Recurring Contracts | ⏭ Deferred | Auto-renewal scheduling (nice-to-have) |
+| 8 — Notifications | ⏭ Deferred | In-app + email notifications (nice-to-have) |
 
 ---
 
 ## Contributing
 
-1. Branch off `develop` using the convention `feat/<short-description>` or `fix/<short-description>`
+1. Branch off `develop` using `feat/<short-description>` or `fix/<short-description>`
 2. Keep PRs focused — one feature or fix per PR
 3. Run `npx tsc --noEmit` in both packages before pushing
-4. Update `TASKS.md` when completing a phase item
-5. Add entries to `USER_TESTING.md` for any new user-facing flows
+4. Update `TASKS.md` checkboxes when completing phase items
+5. Run `npm run db:migrate -w packages/backend` after any schema changes and commit the generated migration file

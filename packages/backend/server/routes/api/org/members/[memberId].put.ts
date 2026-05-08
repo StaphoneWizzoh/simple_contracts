@@ -1,10 +1,11 @@
 import { prisma } from "../../../../db";
 import { requirePermission, PERMISSIONS } from "../../../../utils/permissions";
+import type { UpdateMemberRoleBody } from "../../../../types/org";
 
 export default defineEventHandler(async (event) => {
     const ctx = await requirePermission(event, PERMISSIONS.MANAGE_USERS);
     const memberId = getRouterParam(event, "memberId");
-    const body = await readBody(event) as { roleId?: string };
+    const body = await readBody(event) as UpdateMemberRoleBody;
 
     if (!memberId) throw createError({ statusCode: 400, statusMessage: "Member ID required" });
     if (!body?.roleId) throw createError({ statusCode: 400, statusMessage: "roleId required" });

@@ -1,13 +1,7 @@
 import { prisma } from "../../../db";
 import { requirePermission, PERMISSIONS } from "../../../utils/permissions";
-
-type PublishBody = {
-    contractId?: string;
-    title?: string;
-    description?: string;
-    counterpartyName?: string;
-    contentHtml?: string;
-};
+import { assertTransition } from "../../../utils/contractStatus";
+import type { PublishBody } from "../../../types/contracts";
 
 export default defineEventHandler(async (event) => {
     const ctx = await requirePermission(event, PERMISSIONS.CREATE_CONTRACTS);
@@ -28,6 +22,8 @@ export default defineEventHandler(async (event) => {
     if (!existing) {
         throw createError({ statusCode: 404, statusMessage: "Contract not found" });
     }
+
+    assertTransition(existing.status, "REVIEW");
 
     const nextVersionNumber = (existing.versions[0]?.versionNumber ?? 0) + 1;
 
