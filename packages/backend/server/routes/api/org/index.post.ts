@@ -1,6 +1,7 @@
 import { auth } from "../../../auth";
 import { prisma } from "../../../db";
 import { seedDefaultRoles, getAdminRole } from "../../../utils/permissions";
+import type { CreateOrgBody } from "../../../types/org";
 
 export default defineEventHandler(async (event) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -16,7 +17,7 @@ export default defineEventHandler(async (event) => {
         throw createError({ statusCode: 409, statusMessage: "Already a member of an organisation" });
     }
 
-    const body = await readBody(event) as { name?: string; legalName?: string };
+    const body = await readBody(event) as CreateOrgBody;
     if (!body?.name?.trim()) {
         throw createError({ statusCode: 400, statusMessage: "Organisation name is required" });
     }
