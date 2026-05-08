@@ -1,10 +1,11 @@
 import { prisma } from "../../../../db";
 import { requirePermission, PERMISSIONS } from "../../../../utils/permissions";
 import { randomBytes } from "crypto";
+import type { SendInviteBody } from "../../../../types/org";
 
 export default defineEventHandler(async (event) => {
     const ctx = await requirePermission(event, PERMISSIONS.MANAGE_USERS);
-    const body = await readBody(event) as { email?: string; roleId?: string; expiryDays?: number };
+    const body = await readBody(event) as SendInviteBody;
 
     if (!body?.email?.trim()) throw createError({ statusCode: 400, statusMessage: "Email is required" });
     if (!body?.roleId) throw createError({ statusCode: 400, statusMessage: "roleId is required" });
