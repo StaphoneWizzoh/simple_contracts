@@ -16,3 +16,4 @@ packages/frontend/docs
 packages/backend/docs
 
 .agents
+settings.local.json
