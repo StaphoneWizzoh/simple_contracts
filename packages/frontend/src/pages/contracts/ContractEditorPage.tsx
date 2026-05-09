@@ -7,8 +7,11 @@ import ContractEditor from "@/components/contracts/ContractEditor";
 import ContractPdfDocument from "@/components/contracts/ContractPdfDocument";
 import ContractSettingsPanel from "@/components/contracts/ContractSettingsPanel";
 import ContractApprovalPanel from "@/components/contracts/ContractApprovalPanel";
+import ContractSignatoryPanel from "@/components/contracts/ContractSignatoryPanel";
+import ContractAuditLogPanel from "@/components/contracts/ContractAuditLogPanel";
 import { useGetCurrentUserQuery, useLogoutMutation } from "@/store/services/authApi";
 import { useGetOrgQuery } from "@/store/services/orgApi";
+import { useGetSignatoriesQuery } from "@/store/services/signingApi";
 import {
     useGetContractQuery,
     usePublishContractMutation,
@@ -63,6 +66,9 @@ export default function ContractEditorPage() {
         { skip: !routeId },
     );
 
+    const { data: signatoriesData } = useGetSignatoriesQuery(routeId!, { skip: !routeId });
+    const signatories = signatoriesData?.signatories ?? [];
+
     const [saveDraft, { isLoading: isSavingDraft }] = useSaveDraftMutation();
     const [publishContract, { isLoading: isPublishing }] = usePublishContractMutation();
     const [terminateContract, { isLoading: isTerminating }] = useTerminateContractMutation();
@@ -72,6 +78,7 @@ export default function ContractEditorPage() {
     const isDraft = existingContract?.status === "DRAFT" || !isEditMode;
     const isReview = existingContract?.status === "REVIEW";
     const isActive = existingContract?.status === "ACTIVE";
+    const isSentForSigning = existingContract?.status === "SENT_FOR_SIGNING";
     const isLocked = isEditMode && !isDraft;
 
     useEffect(() => {
@@ -196,6 +203,8 @@ export default function ContractEditorPage() {
                                             ...existingContract,
                                             contentHtml: draftHtml || existingContract.contentHtml,
                                         }}
+                                        orgName={orgData?.org?.name}
+                                        signatories={signatories.length > 0 ? signatories : undefined}
                                     />
                                 }
                                 fileName={`${existingContract.contractNumber ?? existingContract.id}-${existingContract.title.replace(/\s+/g, "-").toLowerCase()}.pdf`}
@@ -323,6 +332,16 @@ export default function ContractEditorPage() {
                     />
                 )}
 
+                {/* Signatory Panel (pre-signing and signing stage) */}
+                {isEditMode && existingContract && (isReview || isSentForSigning || isActive) && (
+                    <ContractSignatoryPanel
+                        contractId={existingContract.id}
+                        contractTitle={existingContract.title}
+                        contractStatus={existingContract.status}
+                        userPermissions={userPermissions}
+                    />
+                )}
+
                 {/* Terminate action (ACTIVE only) */}
                 {isActive && userPermissions.includes("manage_org") && (
                     <section className="rounded-2xl border border-red-500/20 bg-gray-900/50 p-5">
@@ -367,6 +386,11 @@ export default function ContractEditorPage() {
                             </div>
                         )}
                     </section>
+                )}
+
+                {/* Audit log — all existing contracts */}
+                {isEditMode && existingContract && (
+                    <ContractAuditLogPanel contractId={existingContract.id} />
                 )}
 
                 {/* Content Editor (DRAFT) or Read-only view (all other statuses) */}
