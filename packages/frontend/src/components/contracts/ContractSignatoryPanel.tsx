@@ -46,7 +46,7 @@ function buildMailtoHref(email: string, contractTitle: string, signingUrl: strin
 }
 
 export default function ContractSignatoryPanel({ contractId, contractTitle, contractStatus, userPermissions }: Props) {
-    const canManage = userPermissions.includes("send_for_signing");
+    const canManage = userPermissions?.includes?.("send_for_signing") ?? false;
     const isSentForSigning = contractStatus === "SENT_FOR_SIGNING";
 
     const { data, isLoading } = useGetSignatoriesQuery(contractId);
