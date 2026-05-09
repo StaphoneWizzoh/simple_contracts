@@ -1,7 +1,10 @@
 import { prisma } from "../../../db";
 import { createHash } from "crypto";
+import { enforceRateLimit } from "../../../utils/rateLimit";
 
 export default defineEventHandler(async (event) => {
+    enforceRateLimit(event, 30, 60_000);
+
     const token = getRouterParam(event, "token");
 
     if (!token) throw createError({ statusCode: 400, statusMessage: "Token required" });
