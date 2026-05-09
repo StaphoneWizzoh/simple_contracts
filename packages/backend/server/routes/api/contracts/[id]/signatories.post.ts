@@ -11,6 +11,11 @@ export default defineEventHandler(async (event) => {
     if (!body?.legalName?.trim()) throw createError({ statusCode: 400, statusMessage: "Legal name is required" });
     if (!body?.email?.trim()) throw createError({ statusCode: 400, statusMessage: "Email is required" });
 
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(body.email.trim())) {
+        throw createError({ statusCode: 400, statusMessage: "Invalid email format" });
+    }
+
     const contract = await prisma.contract.findFirst({
         where: { id: contractId, organizationId: ctx.organizationId },
     });
