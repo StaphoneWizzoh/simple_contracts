@@ -1,6 +1,8 @@
 import { useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import SignatureCanvas from "react-signature-canvas";
+import DOMPurify from "dompurify";
+import { toast } from "sonner";
 import {
     useGetSigningContextQuery,
     useSubmitSignatureMutation,
@@ -123,7 +125,7 @@ export default function SigningPage() {
             await submitSignature({ token: token!, signatureData, signatureType: effectiveMode }).unwrap();
             setDone("signed");
         } catch (err) {
-            alert(getErrorMessage(err));
+            toast.error(getErrorMessage(err));
         }
     };
 
@@ -132,7 +134,7 @@ export default function SigningPage() {
             await declineSignature({ token: token!, reason: declineReason || undefined }).unwrap();
             setDone("declined");
         } catch (err) {
-            alert(getErrorMessage(err));
+            toast.error(getErrorMessage(err));
         }
     };
 
@@ -164,7 +166,7 @@ export default function SigningPage() {
                     </p>
                     <div
                         className="prose prose-invert prose-sm max-w-none text-gray-300 max-h-[50vh] overflow-y-auto pr-2"
-                        dangerouslySetInnerHTML={{ __html: data.contract.contentHtml }}
+                        dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(data.contract.contentHtml) }}
                     />
                 </section>
 
@@ -212,17 +214,26 @@ export default function SigningPage() {
                     {(effectiveMode === "DRAWN") && (
                         <div className="space-y-2">
                             <label className="text-xs text-gray-400">Draw your signature below</label>
-                            <div className="rounded-xl border-2 border-dashed border-gray-600 bg-white overflow-hidden">
+                            <div
+                                className="rounded-xl border-2 border-dashed border-gray-600 bg-white overflow-hidden"
+                                role="img"
+                                aria-label="Signature drawing area"
+                            >
                                 <SignatureCanvas
                                     ref={sigPadRef}
                                     penColor="black"
-                                    canvasProps={{ className: "w-full", height: 160 }}
+                                    canvasProps={{
+                                        className: "w-full",
+                                        height: 160,
+                                        "aria-label": "Draw your signature here",
+                                    }}
                                 />
                             </div>
                             <button
                                 type="button"
                                 onClick={() => sigPadRef.current?.clear()}
                                 className="text-xs text-gray-500 hover:text-gray-300 underline"
+                                aria-label="Clear signature drawing"
                             >
                                 Clear
                             </button>
