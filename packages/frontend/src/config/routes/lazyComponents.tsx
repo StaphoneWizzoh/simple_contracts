@@ -19,3 +19,6 @@ export const RolesPage = lazy(() => import("@/pages/org/RolesPage"));
 
 //* Invite pages
 export const AcceptInvitePage = lazy(() => import("@/pages/invites/AcceptInvitePage"));
+
+//* Signing pages
+export const SigningPage = lazy(() => import("@/pages/signing/SigningPage"));
