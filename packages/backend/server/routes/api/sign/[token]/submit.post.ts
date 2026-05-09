@@ -1,8 +1,11 @@
 import { prisma } from "../../../../db";
 import { createHash } from "crypto";
 import type { SubmitSignatureBody } from "../../../../types/contracts";
+import { enforceRateLimit } from "../../../../utils/rateLimit";
 
 export default defineEventHandler(async (event) => {
+    enforceRateLimit(event, 10, 60_000);
+
     const token = getRouterParam(event, "token");
     const body = await readBody<SubmitSignatureBody>(event);
 
@@ -10,6 +13,20 @@ export default defineEventHandler(async (event) => {
     if (!body?.signatureData) throw createError({ statusCode: 400, statusMessage: "Signature data required" });
     if (!body?.signatureType || !["TYPED", "DRAWN"].includes(body.signatureType)) {
         throw createError({ statusCode: 400, statusMessage: "Invalid signature type" });
+    }
+
+    if (body.signatureType === "DRAWN") {
+        if (!body.signatureData.startsWith("data:image/png;base64,")) {
+            throw createError({ statusCode: 400, statusMessage: "Drawn signature must be a PNG data URL" });
+        }
+        if (body.signatureData.length > 500_000) {
+            throw createError({ statusCode: 400, statusMessage: "Signature image is too large" });
+        }
+    } else {
+        const trimmed = body.signatureData.trim();
+        if (trimmed.length === 0 || trimmed.length > 255) {
+            throw createError({ statusCode: 400, statusMessage: "Typed signature must be 1–255 characters" });
+        }
     }
 
     const tokenHash = createHash("sha256").update(token).digest("hex");
@@ -20,13 +37,7 @@ export default defineEventHandler(async (event) => {
             contractSignature: {
                 include: {
                     party: true,
-                    contract: {
-                        include: {
-                            signatures: {
-                                include: { party: { select: { signingOrder: true } } },
-                            },
-                        },
-                    },
+                    contract: { select: { id: true, status: true, signingWorkflow: true, currentVersionId: true } },
                 },
             },
         },
@@ -43,19 +54,6 @@ export default defineEventHandler(async (event) => {
         throw createError({ statusCode: 422, statusMessage: "Contract is not in signing stage" });
     }
 
-    // Sequential signing: block if an earlier-order signatory hasn't signed yet
-    if (contract.signingWorkflow === "SEQUENTIAL" && sig.party.signingOrder !== null) {
-        const pendingBefore = contract.signatures.some(
-            (s) => s.id !== sig.id
-                && s.party.signingOrder !== null
-                && s.party.signingOrder < sig.party.signingOrder!
-                && s.status !== "SIGNED",
-        );
-        if (pendingBefore) {
-            throw createError({ statusCode: 422, statusMessage: "Previous signatories must sign first" });
-        }
-    }
-
     const ipAddress = (event.node.req.headers["x-forwarded-for"] as string | undefined)?.split(",")[0]?.trim()
         ?? (event.node.req.socket as { remoteAddress?: string })?.remoteAddress
         ?? null;
@@ -63,6 +61,24 @@ export default defineEventHandler(async (event) => {
     const now = new Date();
 
     await prisma.$transaction(async (tx) => {
+        // Re-query signatures inside the transaction to avoid a sequential-signing race condition.
+        // Any concurrent sign request will block until this transaction commits.
+        if (contract.signingWorkflow === "SEQUENTIAL" && sig.party.signingOrder !== null) {
+            const allSigs = await tx.contractSignature.findMany({
+                where: { contractId: sig.contractId },
+                include: { party: { select: { signingOrder: true } } },
+            });
+            const pendingBefore = allSigs.some(
+                (s) => s.id !== sig.id
+                    && s.party.signingOrder !== null
+                    && s.party.signingOrder < sig.party.signingOrder!
+                    && s.status !== "SIGNED",
+            );
+            if (pendingBefore) {
+                throw createError({ statusCode: 422, statusMessage: "Previous signatories must sign first" });
+            }
+        }
+
         await tx.signingToken.update({ where: { id: signingToken.id }, data: { usedAt: now } });
 
         await tx.contractSignature.update({
@@ -93,8 +109,9 @@ export default defineEventHandler(async (event) => {
             },
         });
 
-        // Auto-activate if all signatories have now signed
-        const remaining = contract.signatures.filter((s) => s.id !== sig.id && s.status !== "SIGNED");
+        // Auto-activate if all signatories have now signed (re-query to get fresh state)
+        const allSigsAfter = await tx.contractSignature.findMany({ where: { contractId: sig.contractId } });
+        const remaining = allSigsAfter.filter((s) => s.id !== sig.id && s.status !== "SIGNED");
         if (remaining.length === 0) {
             await tx.contract.update({ where: { id: sig.contractId }, data: { status: "ACTIVE" } });
             await tx.contractAuditLog.create({
