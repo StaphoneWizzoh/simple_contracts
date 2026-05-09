@@ -1,8 +1,11 @@
 import { prisma } from "../../../../db";
 import { createHash } from "crypto";
 import type { DeclineSignatureBody } from "../../../../types/contracts";
+import { enforceRateLimit } from "../../../../utils/rateLimit";
 
 export default defineEventHandler(async (event) => {
+    enforceRateLimit(event, 10, 60_000);
+
     const token = getRouterParam(event, "token");
     const body = await readBody<DeclineSignatureBody>(event);
 
@@ -27,6 +30,7 @@ export default defineEventHandler(async (event) => {
     const ipAddress = (event.node.req.headers["x-forwarded-for"] as string | undefined)?.split(",")[0]?.trim()
         ?? (event.node.req.socket as { remoteAddress?: string })?.remoteAddress
         ?? null;
+    const userAgent = (event.node.req.headers["user-agent"] as string | undefined) ?? null;
     const now = new Date();
 
     await prisma.$transaction(async (tx) => {
@@ -47,6 +51,7 @@ export default defineEventHandler(async (event) => {
                     email: sig.party.email,
                     reason: body?.reason ?? null,
                     ipAddress,
+                    userAgent,
                 }),
             },
         });
