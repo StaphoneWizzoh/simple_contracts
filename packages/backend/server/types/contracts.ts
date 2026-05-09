@@ -42,3 +42,20 @@ export type RejectBody = {
 export type TerminateBody = {
     reason?: string;
 };
+
+export type AddSignatoryBody = {
+    legalName: string;
+    email: string;
+    title?: string;
+    organization?: string;
+    signingOrder?: number;
+};
+
+export type SubmitSignatureBody = {
+    signatureData: string;
+    signatureType: "TYPED" | "DRAWN";
+};
+
+export type DeclineSignatureBody = {
+    reason?: string;
+};
