@@ -3,16 +3,21 @@ import {
     Page,
     Text,
     View,
+    Image,
     StyleSheet,
 } from "@react-pdf/renderer";
 import { htmlToPdfElements } from "@/utils/htmlToPdfElements";
 import type { ContractDetail } from "@/store/services/contractApi";
+import type { Signatory } from "@/types/signing";
 
 const INDIGO = "#4f46e5";
 const DARK = "#111827";
 const MUTED = "#6b7280";
 const BORDER = "#e5e7eb";
 const BG_LIGHT = "#f9fafb";
+const GREEN = "#059669";
+const RED = "#dc2626";
+const AMBER = "#d97706";
 
 const styles = StyleSheet.create({
     page: {
@@ -24,7 +29,6 @@ const styles = StyleSheet.create({
         paddingHorizontal: 52,
         backgroundColor: "#ffffff",
     },
-    // Header band
     headerBand: {
         flexDirection: "row",
         justifyContent: "space-between",
@@ -56,7 +60,6 @@ const styles = StyleSheet.create({
         paddingHorizontal: 6,
         paddingVertical: 2,
     },
-    // Title block
     contractTitle: {
         fontSize: 22,
         fontWeight: 700,
@@ -71,7 +74,6 @@ const styles = StyleSheet.create({
         textTransform: "uppercase",
         letterSpacing: 1,
     },
-    // Metadata grid
     metaGrid: {
         flexDirection: "row",
         flexWrap: "wrap",
@@ -98,7 +100,6 @@ const styles = StyleSheet.create({
         fontSize: 10,
         color: DARK,
     },
-    // Description box
     descriptionBox: {
         backgroundColor: "#eef2ff",
         borderLeft: `3px solid ${INDIGO}`,
@@ -119,7 +120,6 @@ const styles = StyleSheet.create({
         color: "#3730a3",
         lineHeight: 1.5,
     },
-    // Section divider
     sectionDivider: {
         borderBottom: `1px solid ${BORDER}`,
         marginBottom: 16,
@@ -133,11 +133,10 @@ const styles = StyleSheet.create({
         letterSpacing: 1.5,
         marginBottom: 12,
     },
-    // Content area
     contentArea: {
         marginBottom: 24,
     },
-    // Signature block
+    // Signature section
     signatureSection: {
         marginTop: 28,
         borderTop: `2px solid ${BORDER}`,
@@ -153,40 +152,100 @@ const styles = StyleSheet.create({
     },
     signatureGrid: {
         flexDirection: "row",
-        gap: 20,
+        flexWrap: "wrap",
+        gap: 12,
     },
     signatureBox: {
         flex: 1,
+        minWidth: 180,
         border: `1px solid ${BORDER}`,
         borderRadius: 6,
         padding: 12,
+    },
+    signatureBoxSigned: {
+        border: `1px solid ${GREEN}`,
+        backgroundColor: "#f0fdf4",
+    },
+    signatureBoxDeclined: {
+        border: `1px solid ${RED}`,
+        backgroundColor: "#fef2f2",
+    },
+    signatureBoxPending: {
+        border: `1px solid ${AMBER}`,
+        backgroundColor: "#fffbeb",
     },
     signatureRole: {
         fontSize: 8,
         color: MUTED,
         textTransform: "uppercase",
         letterSpacing: 1,
-        marginBottom: 4,
+        marginBottom: 2,
     },
     signatureName: {
         fontSize: 11,
         fontWeight: 700,
         color: DARK,
-        marginBottom: 2,
+        marginBottom: 1,
     },
     signatureOrg: {
         fontSize: 9,
         color: MUTED,
-        marginBottom: 16,
+        marginBottom: 10,
     },
+    signatureEmail: {
+        fontSize: 8,
+        color: MUTED,
+        marginBottom: 10,
+    },
+    // Blank signature line (for unsigned)
     signatureLine: {
         borderBottom: `1px solid ${DARK}`,
         marginBottom: 4,
-        height: 28,
+        height: 32,
     },
-    signatureLineLabel: {
+    // Typed signature rendering
+    typedSignatureContainer: {
+        height: 32,
+        justifyContent: "flex-end",
+        borderBottom: `1px solid ${DARK}`,
+        marginBottom: 4,
+    },
+    typedSignatureText: {
+        fontSize: 18,
+        fontFamily: "Helvetica-Oblique",
+        color: DARK,
+        marginBottom: 2,
+    },
+    // Drawn signature image
+    signatureImage: {
+        height: 48,
+        objectFit: "contain",
+        objectPositionX: "left",
+        marginBottom: 4,
+        borderBottom: `1px solid ${DARK}`,
+    },
+    signatureStatusLabel: {
         fontSize: 8,
         color: MUTED,
+    },
+    signatureStatusSigned: {
+        fontSize: 8,
+        color: GREEN,
+        fontWeight: 700,
+    },
+    signatureStatusDeclined: {
+        fontSize: 8,
+        color: RED,
+        fontWeight: 700,
+    },
+    signatureStatusPending: {
+        fontSize: 8,
+        color: AMBER,
+    },
+    signedDate: {
+        fontSize: 8,
+        color: MUTED,
+        marginTop: 2,
     },
     // Footer
     footer: {
@@ -219,6 +278,18 @@ function formatDate(dateStr: string | null | undefined): string {
     });
 }
 
+function formatDateTime(dateStr: string | null | undefined): string {
+    if (!dateStr) return "—";
+    return new Date(dateStr).toLocaleString("en-US", {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+        timeZoneName: "short",
+    });
+}
+
 function formatStatus(status: string): string {
     return status.replace(/_/g, " ");
 }
@@ -226,14 +297,89 @@ function formatStatus(status: string): string {
 interface ContractPdfDocumentProps {
     contract: ContractDetail;
     orgName?: string;
+    signatories?: Signatory[];
 }
 
-export default function ContractPdfDocument({ contract, orgName }: ContractPdfDocumentProps) {
+function SignatoryBlock({ signatory, orgName }: { signatory: Signatory; orgName?: string }) {
+    const sig = signatory.signatures[0];
+    const status = sig?.status ?? "NOT_SENT";
+    const isSigned = status === "SIGNED";
+    const isDeclined = status === "DECLINED";
+
+    const boxStyle = isSigned
+        ? [styles.signatureBox, styles.signatureBoxSigned]
+        : isDeclined
+        ? [styles.signatureBox, styles.signatureBoxDeclined]
+        : [styles.signatureBox, styles.signatureBoxPending];
+
+    return (
+        <View style={boxStyle}>
+            <Text style={styles.signatureRole}>
+                {signatory.title
+                    ? `${signatory.title}${signatory.organization ? ` · ${signatory.organization}` : ""}`
+                    : signatory.organization ?? "Signatory"}
+            </Text>
+            <Text style={styles.signatureName}>{signatory.legalName}</Text>
+            {signatory.email && <Text style={styles.signatureEmail}>{signatory.email}</Text>}
+
+            {isSigned && sig?.signatureType === "DRAWN" && sig?.signatureData ? (
+                <Image src={sig.signatureData} style={styles.signatureImage} />
+            ) : isSigned && sig?.signatureType === "TYPED" && sig?.signatureData ? (
+                <View style={styles.typedSignatureContainer}>
+                    <Text style={styles.typedSignatureText}>{sig.signatureData}</Text>
+                </View>
+            ) : (
+                <View style={styles.signatureLine} />
+            )}
+
+            {isSigned ? (
+                <>
+                    <Text style={styles.signatureStatusSigned}>✓ Signed</Text>
+                    {sig?.signedAt && (
+                        <Text style={styles.signedDate}>{formatDateTime(sig.signedAt)}</Text>
+                    )}
+                    {sig?.ipAddress && (
+                        <Text style={styles.signedDate}>IP: {sig.ipAddress}</Text>
+                    )}
+                </>
+            ) : isDeclined ? (
+                <Text style={styles.signatureStatusDeclined}>✗ Declined</Text>
+            ) : (
+                <Text style={styles.signatureStatusPending}>Awaiting signature</Text>
+            )}
+        </View>
+    );
+}
+
+function FallbackSignatureBlock({ orgName, counterpartyName }: { orgName?: string; counterpartyName?: string | null }) {
+    return (
+        <View style={styles.signatureGrid}>
+            <View style={styles.signatureBox}>
+                <Text style={styles.signatureRole}>Issuing Party</Text>
+                <Text style={styles.signatureName}>{orgName ?? "Organisation"}</Text>
+                <Text style={styles.signatureOrg}> </Text>
+                <View style={styles.signatureLine} />
+                <Text style={styles.signatureStatusLabel}>Signature &amp; Date</Text>
+            </View>
+            <View style={styles.signatureBox}>
+                <Text style={styles.signatureRole}>Counterparty</Text>
+                <Text style={styles.signatureName}>{counterpartyName ?? "—"}</Text>
+                <Text style={styles.signatureOrg}> </Text>
+                <View style={styles.signatureLine} />
+                <Text style={styles.signatureStatusLabel}>Signature &amp; Date</Text>
+            </View>
+        </View>
+    );
+}
+
+export default function ContractPdfDocument({ contract, orgName, signatories }: ContractPdfDocumentProps) {
     const contentNodes = htmlToPdfElements(contract.contentHtml);
     const generatedAt = new Date().toLocaleString("en-US", {
         dateStyle: "medium",
         timeStyle: "short",
     });
+
+    const hasSignatories = signatories && signatories.length > 0;
 
     return (
         <Document
@@ -306,22 +452,18 @@ export default function ContractPdfDocument({ contract, orgName }: ContractPdfDo
                 {/* Signature block */}
                 <View style={styles.signatureSection}>
                     <Text style={styles.signatureTitle}>Signatures</Text>
-                    <View style={styles.signatureGrid}>
-                        <View style={styles.signatureBox}>
-                            <Text style={styles.signatureRole}>Issuing Party</Text>
-                            <Text style={styles.signatureName}>{orgName ?? "Organisation"}</Text>
-                            <Text style={styles.signatureOrg}> </Text>
-                            <View style={styles.signatureLine} />
-                            <Text style={styles.signatureLineLabel}>Signature &amp; Date</Text>
+                    {hasSignatories ? (
+                        <View style={styles.signatureGrid}>
+                            {signatories.map((s) => (
+                                <SignatoryBlock key={s.id} signatory={s} orgName={orgName} />
+                            ))}
                         </View>
-                        <View style={styles.signatureBox}>
-                            <Text style={styles.signatureRole}>Counterparty</Text>
-                            <Text style={styles.signatureName}>{contract.counterpartyName ?? "—"}</Text>
-                            <Text style={styles.signatureOrg}> </Text>
-                            <View style={styles.signatureLine} />
-                            <Text style={styles.signatureLineLabel}>Signature &amp; Date</Text>
-                        </View>
-                    </View>
+                    ) : (
+                        <FallbackSignatureBlock
+                            orgName={orgName}
+                            counterpartyName={contract.counterpartyName}
+                        />
+                    )}
                 </View>
 
                 {/* Footer */}
