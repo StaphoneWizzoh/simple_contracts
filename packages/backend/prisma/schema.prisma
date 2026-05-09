@@ -237,16 +237,35 @@ model ContractSignature {
   declinedAt        DateTime?
   reason            String?
   signedByUserId    String?
+  signatureData     String?
+  signatureType     String?
+  ipAddress         String?
+  userAgent         String?
 
   contract        Contract         @relation(fields: [contractId], references: [id], onDelete: Cascade)
   contractVersion ContractVersion? @relation(fields: [contractVersionId], references: [id], onDelete: SetNull)
   party           ContractParty    @relation(fields: [partyId], references: [id], onDelete: Cascade)
   signedByUser    User?            @relation("SignatureActor", fields: [signedByUserId], references: [id], onDelete: SetNull)
+  signingToken    SigningToken?
 
   @@index([contractId, status])
   @@index([partyId])
   @@index([contractVersionId])
   @@index([signedByUserId])
+}
+
+model SigningToken {
+  id                  String    @id @default(cuid())
+  contractSignatureId String    @unique
+  token               String    @unique
+  signingPath         String?
+  expiresAt           DateTime
+  usedAt              DateTime?
+  createdAt           DateTime  @default(now())
+
+  contractSignature ContractSignature @relation(fields: [contractSignatureId], references: [id], onDelete: Cascade)
+
+  @@index([token])
 }
 
 model ContractAuditLog {
