@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { PDFDownloadLink } from "@react-pdf/renderer";
 import { toast } from "sonner";
 
@@ -18,6 +18,7 @@ import {
     useSaveDraftMutation,
     useTerminateContractMutation,
 } from "@/store/services/contractApi";
+import { useGetTemplateQuery } from "@/store/services/templateApi";
 
 function getErrorMessage(error: unknown): string {
     if (!error || typeof error !== "object") return "Request failed";
@@ -46,6 +47,8 @@ const STATUS_COLOR: Record<string, string> = {
 export default function ContractEditorPage() {
     const navigate = useNavigate();
     const { id: routeId } = useParams<{ id?: string }>();
+    const [searchParams] = useSearchParams();
+    const templateId = searchParams.get("templateId");
     const isEditMode = Boolean(routeId);
 
     const [draftHtml, setDraftHtml] = useState("");
@@ -64,6 +67,11 @@ export default function ContractEditorPage() {
     const { data: existingContract, isLoading: isLoadingContract } = useGetContractQuery(
         routeId!,
         { skip: !routeId },
+    );
+
+    const { data: templateData, isLoading: isLoadingTemplate } = useGetTemplateQuery(
+        templateId!,
+        { skip: !templateId },
     );
 
     const { data: signatoriesData } = useGetSignatoriesQuery(routeId!, { skip: !routeId });
@@ -90,6 +98,14 @@ export default function ContractEditorPage() {
             setInitialContent(existingContract.contentHtml);
         }
     }, [existingContract]);
+
+    useEffect(() => {
+        if (templateData?.template) {
+            setTitle(templateData.template.title);
+            setDescription(templateData.template.description ?? "");
+            setInitialContent(templateData.template.contentHtml);
+        }
+    }, [templateData]);
 
     const handleSaveDraft = async () => {
         if (!isLoggedIn) { toast.error("Please login to save drafts."); return; }
@@ -142,10 +158,10 @@ export default function ContractEditorPage() {
         navigate("/auth/login");
     };
 
-    if (isEditMode && isLoadingContract) {
+    if ((isEditMode && isLoadingContract) || (templateId && isLoadingTemplate)) {
         return (
             <main className="min-h-screen bg-linear-to-br from-gray-950 via-gray-900 to-gray-950 flex items-center justify-center">
-                <p className="text-gray-400">Loading contract…</p>
+                <p className="text-gray-400">Loading {templateId ? "template" : "contract"}…</p>
             </main>
         );
     }
