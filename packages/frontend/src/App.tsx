@@ -8,8 +8,9 @@ import { defaultRoutes } from "@/config/routes/defaultRoutes";
 import { orgRoutes } from "@/config/routes/orgRoutes";
 import { inviteRoutes } from "@/config/routes/inviteRoutes";
 import { signingRoutes } from "@/config/routes/signingRoutes";
+import { templateRoutes } from "@/config/routes/templateRoutes";
 
-const router = createBrowserRouter([defaultRoutes, authRoutes, contractRoutes, orgRoutes, inviteRoutes, signingRoutes]);
+const router = createBrowserRouter([defaultRoutes, authRoutes, contractRoutes, templateRoutes, orgRoutes, inviteRoutes, signingRoutes]);
 
 const App = () => {
     return (
