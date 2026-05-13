@@ -76,6 +76,12 @@ export default function ContractsPage() {
                     </div>
                     <div className="flex gap-3">
                         <button
+                            onClick={() => navigate("/templates")}
+                            className="rounded-lg border border-indigo-500/40 px-4 py-2 text-sm font-semibold text-indigo-300 hover:bg-indigo-600/20 transition"
+                        >
+                            From Template
+                        </button>
+                        <button
                             onClick={() => navigate("/contracts/new")}
                             className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-500"
                         >
@@ -100,12 +106,20 @@ export default function ContractsPage() {
                 {!isContractsLoading && contracts.length === 0 && (
                     <div className="rounded-2xl border border-dashed border-gray-700 p-12 text-center">
                         <p className="text-gray-400">No contracts yet.</p>
-                        <button
-                            onClick={() => navigate("/contracts/new")}
-                            className="mt-4 rounded-lg bg-indigo-600 px-5 py-2 text-sm font-semibold text-white hover:bg-indigo-500"
-                        >
-                            Create your first contract
-                        </button>
+                        <div className="mt-4 flex items-center justify-center gap-3">
+                            <button
+                                onClick={() => navigate("/templates")}
+                                className="rounded-lg border border-indigo-500/40 px-5 py-2 text-sm font-semibold text-indigo-300 hover:bg-indigo-600/20 transition"
+                            >
+                                Browse Templates
+                            </button>
+                            <button
+                                onClick={() => navigate("/contracts/new")}
+                                className="rounded-lg bg-indigo-600 px-5 py-2 text-sm font-semibold text-white hover:bg-indigo-500"
+                            >
+                                Create from scratch
+                            </button>
+                        </div>
                     </div>
                 )}
 
