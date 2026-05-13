@@ -56,20 +56,22 @@ Generated API documentation is available for each package. Run `npm run docs` fr
 │  /api/contracts/:id/*    →  lifecycle actions (see routes)    │
 │  /api/org/**             →  org, members, roles, invites      │
 │  /api/invites/**         →  public invite accept flow         │
+│  /api/sign/**            →  public signing endpoints          │
+│  /sign/:token            →  public signing page (no login)    │
 │                                                               │
 │  Plugins (run at startup):                                    │
 │    expire-contracts      →  hourly auto-expire cron           │
 │                                                               │
 │  Middleware:  getOrgContext / requirePermission               │
-│  Utilities:  assertTransition (status machine)               │
+│  Utilities:  assertTransition (status machine), rateLimit     │
 └──────────────────────────────┬────────────────────────────────┘
                                │ Prisma Client
 ┌──────────────────────────────▼────────────────────────────────┐
 │                      SQLite Database                           │
 │  User, Account, Session, Organization, OrgRole,               │
 │  OrganizationMember, OrgInvite, Contract, ContractVersion,    │
-│  ContractParty, ContractSignature, ContractAuditLog,          │
-│  ContractApproval                                             │
+│  ContractParty, ContractSignature, SigningToken,               │
+│  ContractAuditLog, ContractApproval                           │
 └───────────────────────────────────────────────────────────────┘
 ```
 
@@ -166,7 +168,17 @@ simple_contracts/
 │   │           │       ├── reject.post.ts         # Approver acts: REJECTED → DRAFT
 │   │           │       ├── send-for-signing.post.ts  # REVIEW → SENT_FOR_SIGNING
 │   │           │       ├── terminate.post.ts      # ACTIVE → TERMINATED
-│   │           │       └── settings.patch.ts      # Update contract settings
+│   │           │       ├── settings.patch.ts      # Update contract settings
+│   │           │       ├── signatories.get.ts     # List signatories
+│   │           │       ├── signatories.post.ts    # Add a signatory
+│   │           │       └── signatories/[partyId]/
+│   │           │           ├── invite.post.ts     # Generate signing link
+│   │           │           └── [partyId].delete.ts
+│   │           ├── sign/
+│   │           │   └── [token]/
+│   │           │       ├── [token].get.ts         # Validate token + record VIEWED
+│   │           │       ├── submit.post.ts         # Submit signature → auto-activate
+│   │           │       └── decline.post.ts        # Decline with reason
 │   │           └── org/                 # Org, member, role, invite endpoints
 │   │
 │   └── frontend/src/
@@ -183,12 +195,15 @@ simple_contracts/
 │       │   ├── contracts/
 │       │   │   ├── ContractsPage.tsx    # Contract list with status badges
 │       │   │   └── ContractEditorPage.tsx  # Status-aware editor/viewer page
+│       │   ├── signing/
+│       │   │   └── SigningPage.tsx      # Public signing page (no login required)
 │       │   ├── org/                     # Onboarding, Settings, Members, Roles
 │       │   ├── auth/                    # Login, Signup
 │       │   └── invites/                 # Accept invite page
 │       └── store/services/
 │           ├── contractApi.ts           # All contract RTK Query endpoints + types
 │           ├── orgApi.ts                # Org/members/roles/invites RTK Query
+│           ├── signingApi.ts            # Public signing RTK Query (no auth)
 │           └── authApi.ts              # Auth RTK Query
 │
 ├── TASKS.md                             # Phase-by-phase build roadmap
@@ -263,6 +278,17 @@ Per-contract settings can be configured in `DRAFT` or `REVIEW` status:
 | Signature type | Typed / Drawn / Either |
 | Signing link expiry | 7 / 14 / 30 / 60 days |
 
+### E-Signature Flow
+
+1. Add signatories to a contract — name, email, title, org, signing order (no app account needed)
+2. Send contract for signing (`REVIEW → SENT_FOR_SIGNING`)
+3. Generate a signing link per signatory — `POST /api/contracts/:id/signatories/:partyId/invite`
+   - Token is a random UUID stored as SHA-256 hash in `SigningToken`; the plain token appears only in the response URL
+4. Signatory opens `/sign/:token` (public, no login) — views contract, chooses typed or drawn signature, gives legal consent
+5. Sequential mode: a signatory can only sign after all predecessors (lower `signingOrder`) have signed
+6. When all signatories have signed, the contract auto-transitions to `ACTIVE`
+7. Every step (viewed, signed, declined, activated) is written to `ContractAuditLog`
+
 ### Frontend Route Guards
 
 `ProtectedRoute` wraps every authenticated page and enforces:
@@ -318,6 +344,18 @@ Per-contract settings can be configured in `DRAFT` or `REVIEW` status:
 | `POST` | `/api/org/invites` | `manage_users` | Send an invite |
 | `DELETE` | `/api/org/invites/:id` | `manage_users` | Revoke an invite |
 
+### Signatories & Signing (`/api/contracts/:id/signatories/*`, `/api/sign/*`)
+
+| Method | Path | Permission | Description |
+|---|---|---|---|
+| `GET` | `/api/contracts/:id/signatories` | org member | List signatories for a contract |
+| `POST` | `/api/contracts/:id/signatories` | `send_for_signing` | Add a signatory (name, email, title, org, order) |
+| `DELETE` | `/api/contracts/:id/signatories/:partyId` | `send_for_signing` | Remove a signatory |
+| `POST` | `/api/contracts/:id/signatories/:partyId/invite` | `send_for_signing` | Generate/regenerate signing link |
+| `GET` | `/api/sign/:token` | none | Validate token, return contract + signatory (records VIEWED) |
+| `POST` | `/api/sign/:token/submit` | none | Submit signature data (typed text or drawn PNG) |
+| `POST` | `/api/sign/:token/decline` | none | Decline to sign with optional reason |
+
 ### Invites (public)
 
 | Method | Path | Auth | Description |
@@ -341,7 +379,8 @@ Key models and their purpose:
 | `Contract` | Core contract record — status, settings, ownership |
 | `ContractVersion` | Immutable content snapshots (HTML + text + JSON) |
 | `ContractParty` | External signatories (no app account required) |
-| `ContractSignature` | Per-party signing status and metadata |
+| `ContractSignature` | Per-party signing status, signature data, IP, user agent |
+| `SigningToken` | SHA-256-hashed single-use token with expiry per signature |
 | `ContractApproval` | Per-approver approval record (order, status, comment) |
 | `ContractAuditLog` | Immutable event log for every contract action |
 
@@ -391,9 +430,9 @@ See [TASKS.md](./TASKS.md) for the full phase-by-phase feature roadmap.
 |---|---|---|
 | 1 — Multi-tenancy & RBAC | ✅ Done | Org setup, custom roles, invite flow, route guards |
 | 2 — Contract Lifecycle & Workflow | ✅ Done | Status machine, approval workflow, settings panel, auto-expire |
-| 3 — Contract Templates | 🔲 Next | Template CRUD, variable placeholders, "create from template" flow |
-| 4 — E-Signatures | 🔲 Pending | Signatory management, secure signing links, public signing page |
-| 5 — PDF Export | 🟡 Partial | Contract PDF done; signature block + audit summary pending Phase 4 |
+| 3 — Contract Templates | 🟡 Partial | Template CRUD ✅, "create from template" ✅, variable versioning pending |
+| 4 — E-Signatures | ✅ Done | Signatory management, secure signing links, public signing page, auto-activation |
+| 5 — PDF Export | 🟡 Partial | Contract PDF done; signature block + audit summary page pending |
 | 6 — Search & Reporting | 🔲 Pending | Full-text search, dashboard reports, CSV/PDF export |
 | 7 — Recurring Contracts | ⏭ Deferred | Auto-renewal scheduling (nice-to-have) |
 | 8 — Notifications | ⏭ Deferred | In-app + email notifications (nice-to-have) |
