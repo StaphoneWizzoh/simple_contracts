@@ -34,6 +34,7 @@ function Dashboard({ user }: { user: { id: string; name?: string | null; email: 
     const recentContracts = contracts.slice(0, 5);
 
     const canCreateContracts = permissions.includes("create_contracts");
+    const canCreateTemplates = permissions.includes("create_templates");
     const canManageOrg = permissions.includes("manage_org");
     const canManageUsers = permissions.includes("manage_users");
     const canManageRoles = permissions.includes("manage_roles");
@@ -71,6 +72,12 @@ function Dashboard({ user }: { user: { id: string; name?: string | null; email: 
                         className="px-4 py-1.5 text-sm font-medium text-gray-300 hover:text-indigo-300 transition-colors"
                     >
                         Contracts
+                    </button>
+                    <button
+                        onClick={() => navigate("/templates")}
+                        className="px-4 py-1.5 text-sm font-medium text-gray-300 hover:text-indigo-300 transition-colors"
+                    >
+                        Templates
                     </button>
                     <button
                         onClick={() => navigate("/org/settings")}
@@ -209,6 +216,12 @@ function Dashboard({ user }: { user: { id: string; name?: string | null; email: 
                                     label="All Contracts"
                                     desc="View and manage your contracts"
                                     onClick={() => navigate("/contracts")}
+                                    accent="gray"
+                                />
+                                <ActionCard
+                                    label="Templates"
+                                    desc={canCreateTemplates ? "Browse and create reusable templates" : "Browse available templates"}
+                                    onClick={() => navigate("/templates")}
                                     accent="gray"
                                 />
                                 {(canManageOrg || canManageUsers || canManageRoles) && (

@@ -83,21 +83,30 @@ Per-contract settings the creator can configure:
 
 ---
 
-## Phase 3 — Contract Templates
+## Phase 3 — Contract Templates 🟡 PARTIAL (2026-05-09)
 
-### 3.1 Template System
+### 3.1 Template System ✅
 
-- [ ] `ContractTemplate` model:
-    - `id`, `organizationId`, `title`, `description`, `contentHtml`, `contentJson`, `contentText`, `contractType`, `createdByUserId`, `isActive`, `createdAt`, `updatedAt`
-- [ ] `TemplateVariable` model (or JSON in template):
-    - Variable name, label, type (text | date | number | boolean), required flag, default value
-- [ ] Template CRUD API endpoints (guarded by `create_templates` permission)
-- [ ] Template management UI — list, create, edit, deactivate templates
-- [ ] "Create contract from template" flow:
-    - User picks a template
-    - Document opens in editor with placeholder text (e.g., `{{client_name}}`) already in content
-    - User edits placeholders directly in the rich-text editor
-- [ ] Template versioning (track changes to templates over time)
+- [x] `ContractTemplate` model:
+    - `id`, `organizationId`, `title`, `description`, `contentHtml`, `contentJson`, `contentText`, `contractType`, `createdByUserId`, `isActive`, `version`, `createdAt`, `updatedAt`
+- [x] Variables stored as JSON in template (deferred editable form UI)
+- [x] Template CRUD API endpoints (guarded by `create_templates` permission):
+    - `GET /api/templates` — list active templates
+    - `POST /api/templates` — create
+    - `GET /api/templates/:id` — detail with parsed variables
+    - `PUT /api/templates/:id` — update
+    - `DELETE /api/templates/:id` — soft delete
+- [x] Template management UI:
+    - `/templates` — list page with empty state
+    - `/templates/new` — create template
+    - `/templates/:id` — edit template
+    - Uses same TipTap editor as contracts
+- [x] "Create contract from template" flow:
+    - `POST /api/contracts/from-template/:templateId` — creates draft with pre-filled content
+    - Frontend: `?templateId=` query param on `/contracts/new`
+    - "Use" button on template cards
+    - Contract opens in editor with template content ready to edit
+- [ ] Template versioning — `version` field added but UI not implemented (nice-to-have)
 
 ---
 
@@ -105,55 +114,51 @@ Per-contract settings the creator can configure:
 
 ### 4.1 Signatory Management
 
-- [ ] Add signatories to a contract (name, email, title, organisation, signing order)
-- [ ] Signatories do **not** need app accounts
-- [ ] Per-contract setting: sequential or simultaneous signing
+- [x] Add signatories to a contract (name, email, title, organisation, signing order)
+- [x] Signatories do **not** need app accounts
+- [x] Per-contract setting: sequential or simultaneous signing
 
 ### 4.2 Secure Signing Links
 
-- [ ] `SigningToken` model:
-    - `id`, `contractSignatureId`, `token` (UUID, hashed in DB), `expiresAt`, `usedAt`, `ipAddress` (at creation)
-- [ ] Generate unique signing link per signatory: `/sign/{token}`
-- [ ] Link expiry enforced server-side (duration set in contract settings)
-- [ ] Token single-use (invalidated after signing or declining)
-- [ ] Resend / regenerate signing link (old token invalidated)
+- [x] `SigningToken` model:
+    - `id`, `contractSignatureId`, `token` (UUID, hashed in DB), `expiresAt`, `usedAt`
+- [x] Generate unique signing link per signatory: `/sign/{token}`
+- [x] Link expiry enforced server-side (duration set in contract settings)
+- [x] Token single-use (invalidated after signing or declining)
+- [x] Resend / regenerate signing link (old token invalidated)
 
 ### 4.3 Signing Experience (No Login Required)
 
-- [ ] Public signing page `/sign/:token`:
+- [x] Public signing page `/sign/:token`:
     - Verify token validity (not expired, not used)
     - Display full contract content (read-only)
     - Show signatory details
     - Signature capture — based on contract setting:
         - **Typed** — full legal name text input
-        - **Drawn** — canvas-based signature pad (e.g., `react-signature-canvas`)
+        - **Drawn** — canvas-based signature pad (`react-signature-canvas`)
         - **Both** — signatory chooses
     - Consent checkbox ("I agree this is my legal signature")
     - "Sign" and "Decline" actions
-- [ ] On sign: capture and store:
+- [x] On sign: capture and store:
     - Signature image/text
     - IP address
     - User agent / browser fingerprint
     - Timestamp (UTC)
     - Geolocation (if consented — optional)
-- [ ] Sequential signing: next signatory link only sent/activated after previous signs
-- [ ] Simultaneous signing: all links active at once
-- [ ] On all signatories signed: auto-transition contract to `ACTIVE`
+- [x] Sequential signing: next signatory link only sent/activated after previous signs
+- [x] Simultaneous signing: all links active at once
+- [x] On all signatories signed: auto-transition contract to `ACTIVE`
 
 ### 4.4 Audit Trail
 
-- [ ] Full audit trail per contract (contract timeline view):
-    - Contract created
-    - Version saved
-    - Status changed (with actor)
-    - Reviewer assigned / review submitted
-    - Approver assigned / approved / rejected
-    - Sent for signing
-    - Signatory viewed link (IP, timestamp)
-    - Signatory signed (IP, user agent, timestamp, signature data reference)
+- [x] Audit events per contract:
+    - Signatory added
+    - Signing link generated
+    - Signatory viewed link (IP, timestamp, user agent)
+    - Signatory signed (IP, user agent, timestamp, signature type)
     - Signatory declined (with reason)
-    - Contract activated / expired / terminated
-- [ ] Audit trail API endpoint
+    - Contract auto-activated when all signed
+- [x] Audit trail API endpoint (`GET /api/contracts/:id/audit`)
 - [ ] Audit trail UI component on contract detail page
 
 ---
@@ -268,9 +273,9 @@ Available reports (all exportable to PDF/CSV):
 | Contract versioning                | Done                                          |
 | Audit log (basic)                  | Done                                          |
 | RBAC                               | Done                                          |
-| Templates                          | Not started                                   |
-| Approval workflow                  | Not started                                   |
-| E-signatures                       | Not started                                   |
+| Templates                          | Partial (CRUD + create from template done)    |
+| Approval workflow                  | Done                                          |
+| E-signatures                       | Done                                          |
 | PDF export                         | Done (basic — no signatories/audit trail yet) |
 | Reporting                          | Not started                                   |
 
