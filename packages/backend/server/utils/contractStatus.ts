@@ -13,7 +13,7 @@ const ALLOWED_TRANSITIONS: Record<ContractStatus, ContractStatus[]> = {
     DRAFT: ["REVIEW"],
     REVIEW: ["DRAFT", "SENT_FOR_SIGNING"],
     SENT_FOR_SIGNING: ["ACTIVE"],
-    ACTIVE: ["EXPIRED", "TERMINATED"],
+    ACTIVE: ["EXPIRED", "TERMINATED", "SENT_FOR_SIGNING"],
     EXPIRED: [],
     TERMINATED: [],
 };
