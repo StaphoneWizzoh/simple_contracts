@@ -45,6 +45,7 @@ export type ContractDetail = {
     signingLinkExpiryDays: number;
     contentHtml: string;
     versionNumber: number;
+    signedPdfGeneratedAt: string | null;
     createdAt: string;
     updatedAt: string;
 };
