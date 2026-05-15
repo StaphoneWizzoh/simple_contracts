@@ -26,45 +26,64 @@ export default defineEventHandler(async (event) => {
 
     if (!party) throw createError({ statusCode: 404, statusMessage: "Signatory not found" });
 
-    let signature = await prisma.contractSignature.findFirst({
+    const signature = await prisma.contractSignature.findFirst({
         where: { contractId, partyId },
         include: { signingToken: true },
     });
 
-    if (!signature) {
-        signature = await prisma.contractSignature.create({
-            data: {
-                contractId,
-                contractVersionId: contract.currentVersionId,
-                partyId,
-                status: "PENDING",
-            },
-            include: { signingToken: true },
-        });
-    } else if (signature.signingToken) {
-        // Invalidate old token before regenerating
-        await prisma.signingToken.delete({ where: { id: signature.signingToken.id } });
+    if (signature?.status === "SIGNED") {
+        throw createError({ statusCode: 422, statusMessage: "Signatory has already signed — link cannot be reissued" });
     }
 
     const plainToken = randomUUID();
     const tokenHash = createHash("sha256").update(plainToken).digest("hex");
     const expiresAt = new Date(Date.now() + contract.signingLinkExpiryDays * 24 * 60 * 60 * 1000);
 
-    await prisma.signingToken.create({
-        data: {
-            contractSignatureId: signature.id,
-            token: tokenHash,
-            expiresAt,
-        },
-    });
+    await prisma.$transaction(async (tx) => {
+        if (!signature) {
+            // First-time: create signature record + token together
+            const created = await tx.contractSignature.create({
+                data: {
+                    contractId,
+                    contractVersionId: contract.currentVersionId,
+                    partyId,
+                    status: "PENDING",
+                },
+            });
+            await tx.signingToken.create({
+                data: { contractSignatureId: created.id, token: tokenHash, expiresAt },
+            });
+        } else {
+            // Revoke existing token if present
+            if (signature.signingToken) {
+                await tx.signingToken.delete({ where: { id: signature.signingToken.id } });
+            }
 
-    await prisma.contractAuditLog.create({
-        data: {
-            contractId,
-            actorUserId: ctx.userId,
-            eventType: "SIGNING_LINK_GENERATED",
-            details: JSON.stringify({ partyId, legalName: party.legalName, email: party.email }),
-        },
+            // For a declined signatory, reset back to PENDING so the new link works
+            const resetData = signature.status === "DECLINED"
+                ? { status: "PENDING", viewedAt: null, declinedAt: null, reason: null, ipAddress: null, userAgent: null }
+                : {};
+
+            await tx.contractSignature.update({ where: { id: signature.id }, data: resetData });
+            await tx.signingToken.create({
+                data: { contractSignatureId: signature.id, token: tokenHash, expiresAt },
+            });
+        }
+
+        await tx.contractAuditLog.create({
+            data: {
+                contractId,
+                actorUserId: ctx.userId,
+                eventType: "SIGNING_LINK_GENERATED",
+                details: JSON.stringify({
+                    partyId,
+                    legalName: party.legalName,
+                    email: party.email,
+                    regenerated: Boolean(signature),
+                    previousStatus: signature?.status ?? null,
+                }),
+            },
+        });
     });
 
     return { signingUrl: `/sign/${plainToken}`, expiresAt };

@@ -49,6 +49,7 @@ export default defineEventHandler(async (event) => {
         signingLinkExpiryDays: contract.signingLinkExpiryDays,
         contentHtml: contract.currentVersion?.contentHtml ?? "",
         versionNumber: contract.currentVersion?.versionNumber ?? 1,
+        signedPdfGeneratedAt: contract.signedPdfGeneratedAt ?? null,
         createdAt: contract.createdAt,
         updatedAt: contract.updatedAt,
     };

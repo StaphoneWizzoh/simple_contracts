@@ -8,6 +8,7 @@ import {
 } from "@react-pdf/renderer";
 import { htmlToPdfElements } from "@/utils/htmlToPdfElements";
 import type { ContractDetail } from "@/store/services/contractApi";
+import type { AuditLogEntry } from "@/types/contracts";
 import type { Signatory } from "@/types/signing";
 
 const INDIGO = "#4f46e5";
@@ -267,7 +268,185 @@ const styles = StyleSheet.create({
         fontSize: 8,
         color: MUTED,
     },
+    // Audit trail page
+    auditTable: {
+        marginTop: 8,
+    },
+    auditHeaderRow: {
+        flexDirection: "row",
+        backgroundColor: BG_LIGHT,
+        borderRadius: 4,
+        paddingHorizontal: 8,
+        paddingVertical: 5,
+        marginBottom: 2,
+    },
+    auditRow: {
+        flexDirection: "row",
+        paddingHorizontal: 8,
+        paddingVertical: 5,
+        borderBottom: `1px solid ${BORDER}`,
+    },
+    auditRowAlt: {
+        backgroundColor: BG_LIGHT,
+    },
+    auditColEvent: { width: "24%", fontSize: 9 },
+    auditColActor: { width: "20%", fontSize: 9 },
+    auditColDetail: { width: "36%", fontSize: 9 },
+    auditColTime: { width: "20%", fontSize: 9 },
+    auditHeaderText: {
+        fontSize: 8,
+        fontWeight: 700,
+        color: MUTED,
+        textTransform: "uppercase",
+        letterSpacing: 0.8,
+    },
+    auditCellText: {
+        fontSize: 8,
+        color: DARK,
+        lineHeight: 1.4,
+    },
+    auditCellMuted: {
+        fontSize: 8,
+        color: MUTED,
+        lineHeight: 1.4,
+    },
 });
+
+const AUDIT_EVENT_LABELS: Record<string, string> = {
+    CONTRACT_CREATED:       "Created",
+    VERSION_SAVED:          "Draft saved",
+    STATUS_CHANGED:         "Status changed",
+    REVIEWER_ASSIGNED:      "Reviewers assigned",
+    APPROVED:               "Approved",
+    REJECTED:               "Rejected",
+    SIGNATORY_ADDED:        "Signatory added",
+    SIGNATORY_REMOVED:      "Signatory removed",
+    SIGNING_LINK_GENERATED: "Signing link sent",
+    SIGNATORY_VIEWED:       "Link opened",
+    SIGNATORY_SIGNED:       "Signed",
+    SIGNATORY_DECLINED:     "Declined",
+    CONTRACT_ACTIVATED:     "Activated",
+    CONTRACT_EXPIRED:       "Expired",
+    CONTRACT_TERMINATED:    "Terminated",
+    SIGNED_PDF_STORED:      "PDF sealed",
+};
+
+function auditDetailSummary(eventType: string, details: Record<string, unknown> | null): string {
+    if (!details) return "";
+    switch (eventType) {
+        case "STATUS_CHANGED": {
+            const from = details.from as string | undefined;
+            const to = details.to as string | undefined;
+            return from && to ? `${from.replace(/_/g, " ")} → ${to.replace(/_/g, " ")}` : "";
+        }
+        case "APPROVED":
+        case "REJECTED": {
+            const comment = details.comment as string | undefined;
+            return comment ? `"${comment}"` : "";
+        }
+        case "SIGNATORY_ADDED":
+        case "SIGNATORY_REMOVED":
+        case "SIGNING_LINK_GENERATED":
+        case "SIGNATORY_VIEWED":
+        case "SIGNATORY_SIGNED":
+        case "SIGNATORY_DECLINED": {
+            const name = details.legalName as string | undefined;
+            const sigType = details.signatureType as string | undefined;
+            const reason = details.reason as string | undefined;
+            return [name, sigType ? `${sigType.toLowerCase()} sig` : null, reason ? `"${reason}"` : null]
+                .filter(Boolean).join(" · ");
+        }
+        case "REVIEWER_ASSIGNED": {
+            const count = (details.approverIds as string[] | undefined)?.length;
+            const workflow = details.workflow as string | undefined;
+            return [count !== undefined ? `${count} reviewer${count !== 1 ? "s" : ""}` : null, workflow?.toLowerCase()]
+                .filter(Boolean).join(" · ");
+        }
+        case "SIGNED_PDF_STORED": {
+            const sizeBytes = details.sizeBytes as number | undefined;
+            return sizeBytes ? `${Math.round(sizeBytes / 1024)} KB` : "";
+        }
+        default:
+            return "";
+    }
+}
+
+function AuditTrailPage({
+    auditLog,
+    orgName,
+    contractNumber,
+}: {
+    auditLog: AuditLogEntry[];
+    orgName?: string;
+    contractNumber?: string | null;
+}) {
+    const sorted = [...auditLog].sort(
+        (a, b) => new Date(a.createdAt as string).getTime() - new Date(b.createdAt as string).getTime(),
+    );
+    const generatedAt = new Date().toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" });
+
+    return (
+        <Page size="A4" style={styles.page}>
+            {/* Header band */}
+            <View style={styles.headerBand} fixed>
+                <View>
+                    <Text style={styles.appName}>{orgName ?? "SimpleContracts"}</Text>
+                    <Text style={styles.contractNumber}>{contractNumber ?? ""}</Text>
+                </View>
+                <Text style={styles.statusBadge}>Audit Trail</Text>
+            </View>
+
+            <Text style={{ fontSize: 16, fontWeight: 700, color: DARK, marginBottom: 4 }}>
+                Activity Log
+            </Text>
+            <Text style={{ fontSize: 9, color: MUTED, marginBottom: 16 }}>
+                Complete chronological record of all actions taken on this contract.
+            </Text>
+
+            {/* Table */}
+            <View style={styles.auditTable}>
+                {/* Header */}
+                <View style={styles.auditHeaderRow}>
+                    <View style={styles.auditColEvent}><Text style={styles.auditHeaderText}>Event</Text></View>
+                    <View style={styles.auditColActor}><Text style={styles.auditHeaderText}>Actor</Text></View>
+                    <View style={styles.auditColDetail}><Text style={styles.auditHeaderText}>Detail</Text></View>
+                    <View style={styles.auditColTime}><Text style={styles.auditHeaderText}>Timestamp</Text></View>
+                </View>
+
+                {sorted.map((entry, idx) => {
+                    const label = AUDIT_EVENT_LABELS[entry.eventType]
+                        ?? entry.eventType.replace(/_/g, " ").toLowerCase();
+                    const detail = auditDetailSummary(entry.eventType, entry.details as Record<string, unknown> | null);
+                    const actor = entry.actorName ?? entry.actorEmail ?? "system";
+                    const ts = new Date(entry.createdAt as string).toLocaleString("en-US", {
+                        month: "short", day: "numeric", year: "numeric",
+                        hour: "2-digit", minute: "2-digit",
+                    });
+
+                    return (
+                        <View key={entry.id} style={[styles.auditRow, idx % 2 !== 0 ? styles.auditRowAlt : {}]}>
+                            <View style={styles.auditColEvent}><Text style={styles.auditCellText}>{label}</Text></View>
+                            <View style={styles.auditColActor}><Text style={styles.auditCellMuted}>{actor}</Text></View>
+                            <View style={styles.auditColDetail}><Text style={styles.auditCellMuted}>{detail}</Text></View>
+                            <View style={styles.auditColTime}><Text style={styles.auditCellMuted}>{ts}</Text></View>
+                        </View>
+                    );
+                })}
+            </View>
+
+            {/* Footer */}
+            <View style={styles.footer} fixed>
+                <Text style={styles.footerText}>
+                    Generated {generatedAt} · {contractNumber ?? ""}
+                </Text>
+                <Text
+                    style={styles.pageNumber}
+                    render={({ pageNumber, totalPages }) => `Page ${pageNumber} of ${totalPages}`}
+                />
+            </View>
+        </Page>
+    );
+}
 
 function formatDate(dateStr: string | null | undefined): string {
     if (!dateStr) return "—";
@@ -298,6 +477,7 @@ interface ContractPdfDocumentProps {
     contract: ContractDetail;
     orgName?: string;
     signatories?: Signatory[];
+    auditLog?: AuditLogEntry[];
 }
 
 function SignatoryBlock({ signatory, orgName }: { signatory: Signatory; orgName?: string }) {
@@ -372,7 +552,7 @@ function FallbackSignatureBlock({ orgName, counterpartyName }: { orgName?: strin
     );
 }
 
-export default function ContractPdfDocument({ contract, orgName, signatories }: ContractPdfDocumentProps) {
+export default function ContractPdfDocument({ contract, orgName, signatories, auditLog }: ContractPdfDocumentProps) {
     const contentNodes = htmlToPdfElements(contract.contentHtml);
     const generatedAt = new Date().toLocaleString("en-US", {
         dateStyle: "medium",
@@ -479,6 +659,13 @@ export default function ContractPdfDocument({ contract, orgName, signatories }: 
                     />
                 </View>
             </Page>
+            {auditLog && auditLog.length > 0 && (
+                <AuditTrailPage
+                    auditLog={auditLog}
+                    orgName={orgName}
+                    contractNumber={contract.contractNumber}
+                />
+            )}
         </Document>
     );
 }

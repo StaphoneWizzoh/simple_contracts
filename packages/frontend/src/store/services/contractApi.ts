@@ -118,6 +118,14 @@ export const contractApi = createApi({
             invalidatesTags: (_r, _e, id) => [{ type: "Contract", id }, "Contract"],
         }),
 
+        reopenForSigning: builder.mutation<{ success: boolean; status: string }, string>({
+            query: (contractId) => ({
+                url: `/contracts/${contractId}/reopen-signing`,
+                method: "POST",
+            }),
+            invalidatesTags: (_r, _e, id) => [{ type: "Contract", id }, "Contract"],
+        }),
+
         terminateContract: builder.mutation<{ success: boolean; status: string }, TerminateRequest>({
             query: ({ contractId, ...body }) => ({
                 url: `/contracts/${contractId}/terminate`,
@@ -134,6 +142,15 @@ export const contractApi = createApi({
             query: (contractId) => `/contracts/${contractId}/audit`,
             providesTags: (_r, _e, id) => [{ type: "AuditLog", id }],
         }),
+
+        uploadSignedPdf: builder.mutation<{ success: boolean }, { contractId: string; pdfBase64: string }>({
+            query: ({ contractId, pdfBase64 }) => ({
+                url: `/contracts/${contractId}/signed-pdf`,
+                method: "POST",
+                body: { pdfBase64 },
+            }),
+            invalidatesTags: (_r, _e, arg) => [{ type: "Contract", id: arg.contractId }],
+        }),
     }),
 });
 
@@ -148,6 +165,8 @@ export const {
     useApproveContractMutation,
     useRejectContractMutation,
     useSendForSigningMutation,
+    useReopenForSigningMutation,
     useTerminateContractMutation,
     useGetAuditLogQuery,
+    useUploadSignedPdfMutation,
 } = contractApi;

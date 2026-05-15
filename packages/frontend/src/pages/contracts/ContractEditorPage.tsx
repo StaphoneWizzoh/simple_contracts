@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { PDFDownloadLink } from "@react-pdf/renderer";
+import { PDFDownloadLink, pdf } from "@react-pdf/renderer";
 import { toast } from "sonner";
 
 import ContractEditor from "@/components/contracts/ContractEditor";
@@ -14,9 +14,11 @@ import { useGetOrgQuery } from "@/store/services/orgApi";
 import { useGetSignatoriesQuery } from "@/store/services/signingApi";
 import {
     useGetContractQuery,
+    useGetAuditLogQuery,
     usePublishContractMutation,
     useSaveDraftMutation,
     useTerminateContractMutation,
+    useUploadSignedPdfMutation,
 } from "@/store/services/contractApi";
 import { useGetTemplateQuery } from "@/store/services/templateApi";
 
@@ -77,6 +79,12 @@ export default function ContractEditorPage() {
     const { data: signatoriesData } = useGetSignatoriesQuery(routeId!, { skip: !routeId });
     const signatories = signatoriesData?.signatories ?? [];
 
+    const { data: auditLogData } = useGetAuditLogQuery(routeId!, { skip: !routeId });
+
+    const [uploadSignedPdf] = useUploadSignedPdfMutation();
+    const [isGeneratingSignedPdf, setIsGeneratingSignedPdf] = useState(false);
+    const sealAttemptedRef = useRef(false);
+
     const [saveDraft, { isLoading: isSavingDraft }] = useSaveDraftMutation();
     const [publishContract, { isLoading: isPublishing }] = usePublishContractMutation();
     const [terminateContract, { isLoading: isTerminating }] = useTerminateContractMutation();
@@ -106,6 +114,51 @@ export default function ContractEditorPage() {
             setInitialContent(templateData.template.contentHtml);
         }
     }, [templateData]);
+
+    // Auto-seal: generate + upload the signed PDF once when an ACTIVE contract has no stored copy
+    useEffect(() => {
+        if (
+            !existingContract ||
+            existingContract.status !== "ACTIVE" ||
+            existingContract.signedPdfGeneratedAt ||
+            sealAttemptedRef.current ||
+            !orgData ||
+            signatories.length === 0 ||
+            !auditLogData
+        ) return;
+
+        sealAttemptedRef.current = true;
+
+        const sealPdf = async () => {
+            setIsGeneratingSignedPdf(true);
+            try {
+                const blob = await pdf(
+                    <ContractPdfDocument
+                        contract={{ ...existingContract, contentHtml: existingContract.contentHtml }}
+                        orgName={orgData.org?.name}
+                        signatories={signatories}
+                        auditLog={auditLogData.auditLog}
+                    />,
+                ).toBlob();
+
+                const base64 = await new Promise<string>((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onloadend = () => resolve((reader.result as string).split(",")[1]);
+                    reader.onerror = reject;
+                    reader.readAsDataURL(blob);
+                });
+
+                await uploadSignedPdf({ contractId: existingContract.id, pdfBase64: base64 }).unwrap();
+            } catch (err) {
+                console.error("Failed to seal signed PDF:", err);
+                sealAttemptedRef.current = false; // allow retry on next load
+            } finally {
+                setIsGeneratingSignedPdf(false);
+            }
+        };
+
+        sealPdf();
+    }, [existingContract?.status, existingContract?.signedPdfGeneratedAt, signatories, auditLogData, orgData]);
 
     const handleSaveDraft = async () => {
         if (!isLoggedIn) { toast.error("Please login to save drafts."); return; }
@@ -212,22 +265,45 @@ export default function ContractEditorPage() {
                             My Contracts
                         </button>
                         {isEditMode && existingContract && (
-                            <PDFDownloadLink
-                                document={
-                                    <ContractPdfDocument
-                                        contract={{
-                                            ...existingContract,
-                                            contentHtml: draftHtml || existingContract.contentHtml,
-                                        }}
-                                        orgName={orgData?.org?.name}
-                                        signatories={signatories.length > 0 ? signatories : undefined}
-                                    />
-                                }
-                                fileName={`${existingContract.contractNumber ?? existingContract.id}-${existingContract.title.replace(/\s+/g, "-").toLowerCase()}.pdf`}
-                                className="inline-flex items-center rounded-lg border border-indigo-500/50 bg-indigo-900/40 px-4 py-2 text-sm font-medium text-indigo-300 transition hover:bg-indigo-800/50 hover:text-indigo-100"
-                            >
-                                {({ loading }) => loading ? "Preparing PDF…" : "Download PDF"}
-                            </PDFDownloadLink>
+                            <>
+                                <PDFDownloadLink
+                                    document={
+                                        <ContractPdfDocument
+                                            contract={{
+                                                ...existingContract,
+                                                contentHtml: draftHtml || existingContract.contentHtml,
+                                            }}
+                                            orgName={orgData?.org?.name}
+                                            signatories={signatories.length > 0 ? signatories : undefined}
+                                            auditLog={auditLogData?.auditLog}
+                                        />
+                                    }
+                                    fileName={`${existingContract.contractNumber ?? existingContract.id}-${existingContract.title.replace(/\s+/g, "-").toLowerCase()}.pdf`}
+                                    className="inline-flex items-center rounded-lg border border-indigo-500/50 bg-indigo-900/40 px-4 py-2 text-sm font-medium text-indigo-300 transition hover:bg-indigo-800/50 hover:text-indigo-100"
+                                >
+                                    {({ loading }) => loading ? "Preparing PDF…" : "Download PDF"}
+                                </PDFDownloadLink>
+
+                                {isGeneratingSignedPdf && (
+                                    <span className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-500/30 bg-emerald-900/20 px-4 py-2 text-sm font-medium text-emerald-400">
+                                        <svg className="h-3.5 w-3.5 animate-spin" viewBox="0 0 24 24" fill="none">
+                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                                        </svg>
+                                        Sealing signed PDF…
+                                    </span>
+                                )}
+
+                                {!isGeneratingSignedPdf && existingContract.signedPdfGeneratedAt && (
+                                    <a
+                                        href={`/api/contracts/${existingContract.id}/signed-pdf`}
+                                        download
+                                        className="inline-flex items-center rounded-lg border border-emerald-500/50 bg-emerald-900/30 px-4 py-2 text-sm font-medium text-emerald-300 transition hover:bg-emerald-800/40 hover:text-emerald-100"
+                                    >
+                                        Download Signed PDF
+                                    </a>
+                                )}
+                            </>
                         )}
                         {isLoggedIn && (
                             <button

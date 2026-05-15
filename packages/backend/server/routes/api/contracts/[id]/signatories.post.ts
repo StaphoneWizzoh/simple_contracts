@@ -22,6 +22,10 @@ export default defineEventHandler(async (event) => {
 
     if (!contract) throw createError({ statusCode: 404, statusMessage: "Contract not found" });
 
+    if (!["REVIEW", "SENT_FOR_SIGNING"].includes(contract.status)) {
+        throw createError({ statusCode: 422, statusMessage: "Signatories can only be added while the contract is in Review or Sent for Signing" });
+    }
+
     const party = await prisma.contractParty.create({
         data: {
             contractId,
