@@ -6,6 +6,7 @@ import {
     useRemoveSignatoryMutation,
     useGenerateSigningLinkMutation,
 } from "@/store/services/signingApi";
+import { useReopenForSigningMutation } from "@/store/services/contractApi";
 
 interface Props {
     contractId: string;
@@ -30,7 +31,7 @@ const STATUS_BADGE: Record<string, string> = {
 };
 
 const STATUS_LABEL: Record<string, string> = {
-    PENDING: "Awaiting link",
+    PENDING: "Link sent",
     VIEWED: "Link opened",
     SIGNED: "Signed",
     DECLINED: "Declined",
@@ -48,11 +49,13 @@ function buildMailtoHref(email: string, contractTitle: string, signingUrl: strin
 export default function ContractSignatoryPanel({ contractId, contractTitle, contractStatus, userPermissions }: Props) {
     const canManage = userPermissions?.includes?.("send_for_signing") ?? false;
     const isSentForSigning = contractStatus === "SENT_FOR_SIGNING";
+    const isActive = contractStatus === "ACTIVE";
 
     const { data, isLoading } = useGetSignatoriesQuery(contractId);
     const [addSignatory, { isLoading: isAdding }] = useAddSignatoryMutation();
     const [removeSignatory] = useRemoveSignatoryMutation();
     const [generateLink, { isLoading: isGenerating }] = useGenerateSigningLinkMutation();
+    const [reopenForSigning, { isLoading: isReopening }] = useReopenForSigningMutation();
 
     const [showForm, setShowForm] = useState(false);
     const [form, setForm] = useState({ legalName: "", email: "", title: "", organization: "", signingOrder: "" });
@@ -60,9 +63,9 @@ export default function ContractSignatoryPanel({ contractId, contractTitle, cont
     const [linkData, setLinkData] = useState<Record<string, LinkData>>({});
 
     const signatories = data?.signatories ?? [];
-    const pendingCount = signatories.filter((s) => {
+    const noLinkCount = signatories.filter((s) => {
         const status = s.signatures[0]?.status ?? "NOT_SENT";
-        return status !== "SIGNED" && status !== "DECLINED";
+        return status === "NOT_SENT" || status === "DECLINED";
     }).length;
 
     const handleAdd = async () => {
@@ -116,6 +119,15 @@ export default function ContractSignatoryPanel({ contractId, contractTitle, cont
         }
     };
 
+    const handleReopenForSigning = async () => {
+        try {
+            await reopenForSigning(contractId).unwrap();
+            toast.success("Contract reopened — generate signing links for unsigned parties.");
+        } catch (err) {
+            toast.error(getErrorMessage(err));
+        }
+    };
+
     const handleCopyLink = async (partyId: string) => {
         const link = linkData[partyId]?.url;
         if (!link) return;
@@ -131,10 +143,12 @@ export default function ContractSignatoryPanel({ contractId, contractTitle, cont
                     <p className="text-xs text-gray-500 mt-0.5">
                         {isSentForSigning
                             ? "Generate a signing link for each signatory, then send it to them via email."
+                            : isActive
+                            ? "Contract is active — signing is complete."
                             : "Add signatories before sending for signing."}
                     </p>
                 </div>
-                {canManage && !isSentForSigning && (
+                {canManage && contractStatus === "REVIEW" && (
                     <button
                         type="button"
                         onClick={() => setShowForm((v) => !v)}
@@ -145,13 +159,48 @@ export default function ContractSignatoryPanel({ contractId, contractTitle, cont
                 )}
             </div>
 
+            {/* Review-stage hint — signing links only become available after Send for Signing */}
+            {contractStatus === "REVIEW" && signatories.length > 0 && canManage && (
+                <div className="rounded-xl border border-blue-500/20 bg-blue-950/20 px-4 py-3 text-xs text-blue-200/80">
+                    <span className="font-semibold text-blue-200">Links not available yet.</span>{" "}
+                    Use <strong>Send for Signing</strong> above to move this contract to the signing stage — signing links for each signatory will appear here once it's sent.
+                </div>
+            )}
+
+            {/* Active-but-unsigned notice — contract activated before all parties signed; offer recovery */}
+            {isActive && signatories.some((s) => {
+                const st = s.signatures[0]?.status ?? "NOT_SENT";
+                return st !== "SIGNED";
+            }) && canManage && (
+                <div className="rounded-xl border border-orange-500/30 bg-orange-950/20 px-4 py-3 flex items-start gap-3">
+                    <span className="text-orange-400 text-base mt-0.5 shrink-0">⚠</span>
+                    <div className="flex flex-col gap-2.5 text-xs text-orange-200/80 flex-1">
+                        <div className="space-y-0.5">
+                            <p className="font-semibold text-orange-100">Contract is active but not all parties have signed.</p>
+                            <p className="text-orange-300/70">
+                                One or more signatories have not received or completed their signing link.
+                                Reopen the contract to return it to the signing stage and generate missing links.
+                            </p>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={handleReopenForSigning}
+                            disabled={isReopening}
+                            className="self-start rounded-lg bg-orange-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-orange-500 disabled:opacity-50"
+                        >
+                            {isReopening ? "Reopening…" : "Reopen for Signing"}
+                        </button>
+                    </div>
+                </div>
+            )}
+
             {/* Action-needed banner — shown when the contract is awaiting signatures */}
-            {isSentForSigning && pendingCount > 0 && canManage && (
+            {isSentForSigning && noLinkCount > 0 && canManage && (
                 <div className="rounded-xl border border-amber-500/30 bg-amber-950/20 px-4 py-3 flex items-start gap-3">
                     <span className="text-amber-400 text-base mt-0.5">⚠</span>
                     <div className="text-xs text-amber-200 space-y-1">
                         <p className="font-semibold">
-                            {pendingCount} {pendingCount === 1 ? "signatory has" : "signatories have"} not yet received a signing link.
+                            {noLinkCount} {noLinkCount === 1 ? "signatory has" : "signatories have"} not yet received a signing link.
                         </p>
                         <p className="text-amber-300/70">
                             Generate a link for each signatory below, then use <strong>Send Email</strong> or <strong>Copy Link</strong> to share it with them. Signatories will not be notified automatically.
@@ -245,7 +294,7 @@ export default function ContractSignatoryPanel({ contractId, contractTitle, cont
                         const status = latestSig?.status ?? "NOT_SENT";
                         const currentLink = linkData[s.id];
                         const hasLink = Boolean(currentLink);
-                        const canShare = isSentForSigning && canManage && status !== "SIGNED" && status !== "DECLINED";
+                        const canShare = isSentForSigning && canManage && status !== "SIGNED";
 
                         return (
                             <li key={s.id} className="rounded-xl border border-gray-700/60 bg-gray-800/40 p-4">
@@ -288,10 +337,12 @@ export default function ContractSignatoryPanel({ contractId, contractTitle, cont
                                                 >
                                                     {isGenerating && generatingFor === s.id
                                                         ? "Generating…"
-                                                        : hasLink ? "Regenerate Link" : "Generate Link"}
+                                                        : status === "NOT_SENT"
+                                                        ? "Generate Link"
+                                                        : "Regenerate Link"}
                                                 </button>
                                             )}
-                                            {!isSentForSigning && canManage && (
+                                            {canManage && contractStatus === "REVIEW" && (
                                                 <button
                                                     type="button"
                                                     onClick={() => handleRemove(s.id)}
@@ -302,6 +353,22 @@ export default function ContractSignatoryPanel({ contractId, contractTitle, cont
                                             )}
                                         </div>
                                     </div>
+
+                                    {/* Declined callout — signatory previously declined; regenerating resets their status */}
+                                    {canShare && status === "DECLINED" && !hasLink && (
+                                        <div className="rounded-lg border border-orange-500/20 bg-orange-950/20 px-3 py-2 text-xs text-orange-200/80">
+                                            <span className="font-semibold text-orange-100">Signatory declined.</span>{" "}
+                                            Click <strong>Regenerate Link</strong> to revoke the previous decision and send them a new signing link.
+                                        </div>
+                                    )}
+
+                                    {/* Link-not-visible hint — link was issued but is gone after page refresh */}
+                                    {canShare && !hasLink && (status === "PENDING" || status === "VIEWED") && (
+                                        <div className="rounded-lg border border-amber-500/20 bg-amber-950/20 px-3 py-2 text-xs text-amber-200/80">
+                                            <span className="font-semibold text-amber-100">Link no longer visible.</span>{" "}
+                                            A signing link was previously sent. Click <strong>Regenerate Link</strong> to issue a new one — the old link will be invalidated.
+                                        </div>
+                                    )}
 
                                     {/* Link sharing row — only shown after generation */}
                                     {canShare && hasLink && currentLink && (
