@@ -167,6 +167,7 @@ simple_contracts/
 │   │           │       ├── approve.post.ts        # Approver acts: APPROVED
 │   │           │       ├── reject.post.ts         # Approver acts: REJECTED → DRAFT
 │   │           │       ├── send-for-signing.post.ts  # REVIEW → SENT_FOR_SIGNING
+│   │           │       ├── reopen-signing.post.ts # ACTIVE → SENT_FOR_SIGNING (recovery)
 │   │           │       ├── terminate.post.ts      # ACTIVE → TERMINATED
 │   │           │       ├── settings.patch.ts      # Update contract settings
 │   │           │       ├── signatories.get.ts     # List signatories
@@ -174,6 +175,14 @@ simple_contracts/
 │   │           │       └── signatories/[partyId]/
 │   │           │           ├── invite.post.ts     # Generate signing link
 │   │           │           └── [partyId].delete.ts
+│   │           ├── contracts/from-template/
+│   │           │   └── [templateId].post.ts  # Create draft from template
+│   │           ├── templates/
+│   │           │   ├── index.get.ts       # List active templates
+│   │           │   ├── index.post.ts      # Create template
+│   │           │   ├── [id].get.ts        # Template detail
+│   │           │   ├── [id].put.ts        # Update template
+│   │           │   └── [id].delete.ts     # Soft-delete template
 │   │           ├── sign/
 │   │           │   └── [token]/
 │   │           │       ├── [token].get.ts         # Validate token + record VIEWED
@@ -242,7 +251,8 @@ Contracts flow through a strict state machine. Backward transitions (except reje
                     ┌─── rejection ───┐
                     ▼                 │
 DRAFT  →  REVIEW  →  SENT_FOR_SIGNING  →  ACTIVE  →  EXPIRED (auto, hourly)
-                                                  ↘  TERMINATED (manual)
+                                          ↑      ↘  TERMINATED (manual)
+                                          └── reopen-signing (recovery)
 ```
 
 | Transition | Triggered by | Permission required |
@@ -250,7 +260,8 @@ DRAFT  →  REVIEW  →  SENT_FOR_SIGNING  →  ACTIVE  →  EXPIRED (auto, hour
 | `DRAFT → REVIEW` | "Submit for Review" | `create_contracts` |
 | `REVIEW → DRAFT` | Approval rejection | assigned approver or `approve_contracts` |
 | `REVIEW → SENT_FOR_SIGNING` | "Send for Signing" | `send_for_signing` (all approvals must be done) |
-| `SENT_FOR_SIGNING → ACTIVE` | All signatories sign | _Phase 4 — automated_ |
+| `SENT_FOR_SIGNING → ACTIVE` | All signatories sign | automated |
+| `ACTIVE → SENT_FOR_SIGNING` | "Reopen for Signing" recovery | `manage_org` (only when unsigned parties remain) |
 | `ACTIVE → EXPIRED` | Hourly background job | automatic (when `expiresAt` is past) |
 | `ACTIVE → TERMINATED` | Manual termination | `manage_org` |
 
@@ -280,14 +291,37 @@ Per-contract settings can be configured in `DRAFT` or `REVIEW` status:
 
 ### E-Signature Flow
 
-1. Add signatories to a contract — name, email, title, org, signing order (no app account needed)
+1. Add signatories to a contract — name, email, title, org, signing order (no app account needed). Signatories can be added while the contract is in `REVIEW` or `SENT_FOR_SIGNING` status; adding to an `ACTIVE` or later contract is rejected with `422`.
 2. Send contract for signing (`REVIEW → SENT_FOR_SIGNING`)
 3. Generate a signing link per signatory — `POST /api/contracts/:id/signatories/:partyId/invite`
-   - Token is a random UUID stored as SHA-256 hash in `SigningToken`; the plain token appears only in the response URL
+   - Token is a random UUID; only its SHA-256 hash is stored in `SigningToken`. The plain token is returned **once** in the API response and is not recoverable after page refresh (by design — security).
+   - Calling this endpoint again (e.g. after a page refresh) **regenerates** the link: the previous `SigningToken` is deleted inside a `$transaction` so the old link is immediately invalidated. There is no window where both links are simultaneously valid.
+   - If the signatory had previously `DECLINED`, their signature record is atomically reset to `PENDING` (clearing `declinedAt`, `viewedAt`, `reason`, IP, and user-agent) so they can reconsider.
+   - Regenerating a link for a `SIGNED` signatory is blocked (`422`).
 4. Signatory opens `/sign/:token` (public, no login) — views contract, chooses typed or drawn signature, gives legal consent
-5. Sequential mode: a signatory can only sign after all predecessors (lower `signingOrder`) have signed
-6. When all signatories have signed, the contract auto-transitions to `ACTIVE`
-7. Every step (viewed, signed, declined, activated) is written to `ContractAuditLog`
+5. Sequential mode: a signatory can only sign after all predecessors (lower `signingOrder`) have signed. This check runs inside the same `$transaction` as the signature write to prevent race conditions.
+6. When all signatories have signed, the contract auto-transitions to `ACTIVE`. The check compares `ContractParty.count` (all intended parties) against `ContractSignature` rows — a party with no signature row (no link generated yet) correctly blocks activation.
+7. Every step (link generated, viewed, signed, declined, activated) is written to `ContractAuditLog`. Regeneration records `regenerated: true` and the previous status.
+
+#### Reopen for Signing (Recovery)
+
+If a contract reaches `ACTIVE` status but not all parties have signed (e.g. caused by a data inconsistency or a signatory added after partial signing), the contract can be reopened:
+
+- `POST /api/contracts/:id/reopen-signing` (requires `manage_org`)
+- Validates the contract is `ACTIVE` and at least one party has not yet signed
+- Atomically transitions status back to `SENT_FOR_SIGNING` and writes an audit entry
+- An actionable banner is shown in the UI when `contractStatus === "ACTIVE"` and unsigned parties are detected
+
+### Contract Templates
+
+Templates let an organisation pre-author reusable contract bodies that creators can instantiate as drafts.
+
+- Templates are org-scoped and guarded by the `create_templates` permission.
+- Template content uses the same TipTap rich-text format as contracts (`contentHtml` / `contentJson` / `contentText`).
+- A `variables` JSON field stores placeholder metadata; placeholders are left inline in the content for creators to fill manually (variable-substitution UI is deferred).
+- Creating a contract from a template (`POST /api/contracts/from-template/:templateId`) produces a `DRAFT` with the template content pre-filled. On the frontend, navigating to `/contracts/new?templateId=:id` opens the editor with that content loaded.
+- Deleting a template is a soft-delete (`isActive: false`) — existing contracts derived from it are unaffected.
+- Templates carry a `version` integer that increments on update (a versioned diff UI is deferred).
 
 ### Frontend Route Guards
 
@@ -317,6 +351,7 @@ Per-contract settings can be configured in `DRAFT` or `REVIEW` status:
 | `GET` | `/api/contracts/:id` | org member | Full contract detail + settings |
 | `POST` | `/api/contracts/drafts` | `create_contracts` | Save or update a draft |
 | `POST` | `/api/contracts/publish` | `create_contracts` | Move `DRAFT → REVIEW` |
+| `POST` | `/api/contracts/from-template/:templateId` | `create_contracts` | Create a new draft pre-filled with template content |
 | `PATCH` | `/api/contracts/:id/settings` | `create_contracts` | Update contract type, dates, value, workflow settings |
 | `GET` | `/api/contracts/:id/approvals` | org member | List assigned approvers and their status |
 | `GET` | `/api/contracts/:id/audit` | org member | Full chronological audit trail |
@@ -324,7 +359,10 @@ Per-contract settings can be configured in `DRAFT` or `REVIEW` status:
 | `POST` | `/api/contracts/:id/approve` | assigned approver | Submit an approval (with optional comment) |
 | `POST` | `/api/contracts/:id/reject` | assigned approver or `approve_contracts` | Reject → contract returns to `DRAFT` |
 | `POST` | `/api/contracts/:id/send-for-signing` | `send_for_signing` | Advance `REVIEW → SENT_FOR_SIGNING` |
+| `POST` | `/api/contracts/:id/reopen-signing` | `manage_org` | Reopen `ACTIVE → SENT_FOR_SIGNING` when unsigned parties remain |
 | `POST` | `/api/contracts/:id/terminate` | `manage_org` | Terminate an active contract with optional reason |
+| `POST` | `/api/contracts/:id/signed-pdf` | org member | Store the sealed signed PDF (base64 body); idempotent |
+| `GET` | `/api/contracts/:id/signed-pdf` | org member | Download the stored signed PDF as `application/pdf` |
 
 ### Organisation (`/api/org/*`)
 
@@ -351,10 +389,20 @@ Per-contract settings can be configured in `DRAFT` or `REVIEW` status:
 | `GET` | `/api/contracts/:id/signatories` | org member | List signatories for a contract |
 | `POST` | `/api/contracts/:id/signatories` | `send_for_signing` | Add a signatory (name, email, title, org, order) |
 | `DELETE` | `/api/contracts/:id/signatories/:partyId` | `send_for_signing` | Remove a signatory |
-| `POST` | `/api/contracts/:id/signatories/:partyId/invite` | `send_for_signing` | Generate/regenerate signing link |
+| `POST` | `/api/contracts/:id/signatories/:partyId/invite` | `send_for_signing` | Generate / regenerate signing link (revokes previous; resets DECLINED to PENDING) |
 | `GET` | `/api/sign/:token` | none | Validate token, return contract + signatory (records VIEWED) |
 | `POST` | `/api/sign/:token/submit` | none | Submit signature data (typed text or drawn PNG) |
 | `POST` | `/api/sign/:token/decline` | none | Decline to sign with optional reason |
+
+### Templates (`/api/templates/*`)
+
+| Method | Path | Permission | Description |
+|---|---|---|---|
+| `GET` | `/api/templates` | org member | List all active templates for the org |
+| `POST` | `/api/templates` | `create_templates` | Create a new template |
+| `GET` | `/api/templates/:id` | org member | Template detail with parsed variables |
+| `PUT` | `/api/templates/:id` | `create_templates` | Update template content / metadata (increments version) |
+| `DELETE` | `/api/templates/:id` | `create_templates` | Soft-delete a template (`isActive: false`) |
 
 ### Invites (public)
 
@@ -383,6 +431,7 @@ Key models and their purpose:
 | `SigningToken` | SHA-256-hashed single-use token with expiry per signature |
 | `ContractApproval` | Per-approver approval record (order, status, comment) |
 | `ContractAuditLog` | Immutable event log for every contract action |
+| `ContractTemplate` | Org-scoped reusable contract body (soft-deletable, versioned) |
 
 ---
 
@@ -430,9 +479,9 @@ See [TASKS.md](./TASKS.md) for the full phase-by-phase feature roadmap.
 |---|---|---|
 | 1 — Multi-tenancy & RBAC | ✅ Done | Org setup, custom roles, invite flow, route guards |
 | 2 — Contract Lifecycle & Workflow | ✅ Done | Status machine, approval workflow, settings panel, auto-expire |
-| 3 — Contract Templates | 🟡 Partial | Template CRUD ✅, "create from template" ✅, variable versioning pending |
-| 4 — E-Signatures | ✅ Done | Signatory management, secure signing links, public signing page, auto-activation |
-| 5 — PDF Export | 🟡 Partial | Contract PDF done; signature block + audit summary page pending |
+| 3 — Contract Templates | ✅ Done | Template CRUD, "create from template", TipTap editor, variable placeholders; versioning UI deferred |
+| 4 — E-Signatures | ✅ Done | Signatory management, secure signing links, public signing page, audit trail UI, link regeneration/revocation, reopen-for-signing recovery |
+| 5 — PDF Export | ✅ Done | Contract PDF with signatory block, audit trail page (second PDF page), and sealed signed PDF stored in DB |
 | 6 — Search & Reporting | 🔲 Pending | Full-text search, dashboard reports, CSV/PDF export |
 | 7 — Recurring Contracts | ⏭ Deferred | Auto-renewal scheduling (nice-to-have) |
 | 8 — Notifications | ⏭ Deferred | In-app + email notifications (nice-to-have) |
