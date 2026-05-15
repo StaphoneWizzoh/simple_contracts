@@ -166,6 +166,8 @@ model Contract {
   signingWorkflow       String    @default("SIMULTANEOUS")
   signatureType         String    @default("BOTH")
   signingLinkExpiryDays Int       @default(14)
+  signedPdfBytes        Bytes?
+  signedPdfGeneratedAt  DateTime?
   currentVersionId      String?   @unique
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt
