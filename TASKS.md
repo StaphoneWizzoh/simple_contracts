@@ -52,34 +52,35 @@
 
 Full lifecycle: **Draft → Review → Sent for Signing → Active → Expired / Terminated**
 
-- [ ] Update `Contract.status` enum to: `DRAFT | REVIEW | SENT_FOR_SIGNING | ACTIVE | EXPIRED | TERMINATED`
-- [ ] Status transition validation on backend (cannot skip stages, cannot go backwards except to DRAFT from REVIEW)
-- [ ] Auto-expire contracts: background job/cron that sets `ACTIVE → EXPIRED` when `expiresAt` is past
-- [ ] Manual termination endpoint with reason field
+- [x] Update `Contract.status` enum to: `DRAFT | REVIEW | SENT_FOR_SIGNING | ACTIVE | EXPIRED | TERMINATED`
+- [x] Status transition validation on backend (cannot skip stages, cannot go backwards except to DRAFT from REVIEW)
+- [x] `ACTIVE → SENT_FOR_SIGNING` recovery transition added for "Reopen for Signing" use case
+- [x] Auto-expire contracts: background job/cron that sets `ACTIVE → EXPIRED` when `expiresAt` is past
+- [x] Manual termination endpoint with reason field
 
 ### 2.2 Review & Approval Workflow
 
-- [ ] Contract review assignment — creator assigns one or more reviewers (org members with `review_contracts` permission)
-- [ ] Approval workflow settings per contract:
+- [x] Contract review assignment — creator assigns one or more reviewers (org members with `review_contracts` permission)
+- [x] Approval workflow settings per contract:
     - **Sequential** — approvers must approve in a defined order (1st then 2nd then 3rd)
     - **Simultaneous** — all approvers can act in any order; contract advances when all have approved
-- [ ] `ContractApproval` model:
+- [x] `ContractApproval` model:
     - `contractId`, `approverId` (userId), `order` (Int for sequential), `status` (PENDING | APPROVED | REJECTED), `comment`, `actedAt`
-- [ ] Reviewer/approver action UI — approve or reject with optional comment
-- [ ] Rejection flow — contract goes back to DRAFT with rejection comment logged
-- [ ] Audit log entries for every approval/rejection action
+- [x] Reviewer/approver action UI — approve or reject with optional comment
+- [x] Rejection flow — contract goes back to DRAFT with rejection comment logged
+- [x] Audit log entries for every approval/rejection action
 
 ### 2.3 Contract Settings Panel
 
 Per-contract settings the creator can configure:
 
-- [ ] Approval workflow type (sequential / simultaneous)
-- [ ] Signing order for signatories (sequential / simultaneous)
-- [ ] Signature type accepted (typed name / drawn / both)
-- [ ] Signing link expiry duration (e.g., 7 days, 14 days, 30 days)
-- [ ] Effective date and expiry date
-- [ ] Contract value and currency
-- [ ] Contract type (Service Agreement, NDA, Employment, etc. — configurable list)
+- [x] Approval workflow type (sequential / simultaneous)
+- [x] Signing order for signatories (sequential / simultaneous)
+- [x] Signature type accepted (typed name / drawn / both)
+- [x] Signing link expiry duration (e.g., 7 days, 14 days, 30 days)
+- [x] Effective date and expiry date
+- [x] Contract value and currency
+- [x] Contract type (Service Agreement, NDA, Employment, etc. — configurable list)
 
 ---
 
@@ -159,7 +160,7 @@ Per-contract settings the creator can configure:
     - Signatory declined (with reason)
     - Contract auto-activated when all signed
 - [x] Audit trail API endpoint (`GET /api/contracts/:id/audit`)
-- [ ] Audit trail UI component on contract detail page
+- [x] Audit trail UI component on contract detail page (`ContractAuditLogPanel` — chronological timeline with event icons, actor, and detail expansion)
 
 ---
 
@@ -176,9 +177,9 @@ Per-contract settings the creator can configure:
     - Page numbers and generated timestamp in footer
 - [x] "Download PDF" button on contract editor page (visible when editing existing contracts)
 - [x] HTML-to-PDF parser supporting: headings, paragraphs, bold, italic, underline, strikethrough, code, blockquote, ordered & unordered lists, hr
-- [ ] Signature block: populate with actual signatories once e-signature phase is built
-- [ ] Audit trail summary page (add after Phase 4 — audit trail)
-- [ ] Signed contract PDF stored/cached after all signatures collected
+- [x] Signature block: populated with actual signatories — typed name rendered in italic, drawn PNG rendered as image; unsigned/declined states shown with colour-coded boxes
+- [x] Audit trail summary page in PDF — second page appended to the document with a full chronological event table
+- [x] Signed contract PDF auto-generated and stored in DB on first load of an ACTIVE contract; served via `GET /api/contracts/:id/signed-pdf`; "Download Signed PDF" (emerald) button in UI
 
 ---
 
@@ -237,10 +238,11 @@ Available reports (all exportable to PDF/CSV):
 
 ### Security
 
-- [ ] Rate limiting on signing endpoints and invite endpoints
+- [x] Rate limiting on signing endpoints (10 req / 60 s per IP on submit and decline)
+- [ ] Rate limiting on invite endpoints
 - [ ] CSRF protection on state-changing routes
-- [ ] Signing token stored as hash (never plaintext) in DB
-- [ ] All API routes verify org membership before data access
+- [x] Signing token stored as SHA-256 hash (never plaintext) in DB; plain token returned once and never re-queryable
+- [x] All API routes verify org membership before data access
 - [ ] Sensitive audit fields (IP, user agent) stored encrypted or access-controlled
 
 ### UX / UI
