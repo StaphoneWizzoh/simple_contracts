@@ -20,6 +20,7 @@ const EVENT_CONFIG: Record<string, { label: string; icon: string; color: string 
     CONTRACT_ACTIVATED:     { label: "Contract activated",         icon: "🟢", color: "text-emerald-300 bg-emerald-500/10 border-emerald-500/30" },
     CONTRACT_EXPIRED:       { label: "Contract expired",           icon: "⏰", color: "text-gray-400 bg-gray-500/10 border-gray-500/30" },
     CONTRACT_TERMINATED:    { label: "Contract terminated",        icon: "🔴", color: "text-red-300 bg-red-500/10 border-red-500/30" },
+    SIGNED_PDF_STORED:      { label: "Signed PDF sealed",          icon: "📎", color: "text-emerald-300 bg-emerald-500/10 border-emerald-500/30" },
 };
 
 function formatDateTime(dateStr: string): string {
