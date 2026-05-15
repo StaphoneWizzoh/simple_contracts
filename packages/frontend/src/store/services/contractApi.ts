@@ -118,6 +118,14 @@ export const contractApi = createApi({
             invalidatesTags: (_r, _e, id) => [{ type: "Contract", id }, "Contract"],
         }),
 
+        reopenForSigning: builder.mutation<{ success: boolean; status: string }, string>({
+            query: (contractId) => ({
+                url: `/contracts/${contractId}/reopen-signing`,
+                method: "POST",
+            }),
+            invalidatesTags: (_r, _e, id) => [{ type: "Contract", id }, "Contract"],
+        }),
+
         terminateContract: builder.mutation<{ success: boolean; status: string }, TerminateRequest>({
             query: ({ contractId, ...body }) => ({
                 url: `/contracts/${contractId}/terminate`,
@@ -148,6 +156,7 @@ export const {
     useApproveContractMutation,
     useRejectContractMutation,
     useSendForSigningMutation,
+    useReopenForSigningMutation,
     useTerminateContractMutation,
     useGetAuditLogQuery,
 } = contractApi;
