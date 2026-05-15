@@ -109,10 +109,14 @@ export default defineEventHandler(async (event) => {
             },
         });
 
-        // Auto-activate if all signatories have now signed (re-query to get fresh state)
+        // Auto-activate only when every party on the contract has a SIGNED signature.
+        // We must compare against ContractParty (all intended signatories), NOT ContractSignature
+        // (which only contains rows for parties that received a link). A party with no signature
+        // row has not signed, so the contract must stay in SENT_FOR_SIGNING.
+        const totalParties = await tx.contractParty.count({ where: { contractId: sig.contractId } });
         const allSigsAfter = await tx.contractSignature.findMany({ where: { contractId: sig.contractId } });
-        const remaining = allSigsAfter.filter((s) => s.id !== sig.id && s.status !== "SIGNED");
-        if (remaining.length === 0) {
+        const allSigned = allSigsAfter.length === totalParties && allSigsAfter.every((s) => s.status === "SIGNED");
+        if (allSigned) {
             await tx.contract.update({ where: { id: sig.contractId }, data: { status: "ACTIVE" } });
             await tx.contractAuditLog.create({
                 data: {
