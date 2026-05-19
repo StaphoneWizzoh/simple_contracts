@@ -22,3 +22,6 @@ export const AcceptInvitePage = lazy(() => import("@/pages/invites/AcceptInviteP
 
 //* Signing pages
 export const SigningPage = lazy(() => import("@/pages/signing/SigningPage"));
+
+//* Report pages
+export const ReportsPage = lazy(() => import("@/pages/reports/ReportsPage"));
