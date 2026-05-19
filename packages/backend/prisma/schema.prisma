@@ -31,6 +31,7 @@ model User {
   sentInvites             OrgInvite[]          @relation("SentInvites")
   contractApprovals       ContractApproval[]   @relation("ContractApprovals")
   createdTemplates        ContractTemplate[]   @relation("TemplateCreator")
+  savedSearches           SavedSearch[]
 }
 
 model Account {
@@ -81,11 +82,12 @@ model Organization {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  members   OrganizationMember[]
-  contracts Contract[]
-  roles     OrgRole[]
-  invites   OrgInvite[]
-  templates ContractTemplate[]
+  members       OrganizationMember[]
+  contracts     Contract[]
+  roles         OrgRole[]
+  invites       OrgInvite[]
+  templates     ContractTemplate[]
+  savedSearches SavedSearch[]
 
   @@index([name])
 }
@@ -184,6 +186,12 @@ model Contract {
 
   @@unique([organizationId, contractNumber])
   @@index([organizationId, status])
+  @@index([organizationId, expiresAt])
+  @@index([organizationId, effectiveAt])
+  @@index([organizationId, createdAt])
+  @@index([organizationId, totalValueMinor])
+  @@index([organizationId, counterpartyName])
+  @@index([contractType])
   @@index([ownerUserId])
   @@index([createdByUserId])
 }
@@ -256,6 +264,7 @@ model ContractSignature {
   @@index([partyId])
   @@index([contractVersionId])
   @@index([signedByUserId])
+  @@index([signedAt])
 }
 
 model SigningToken {
@@ -328,4 +337,18 @@ model ContractTemplate {
 
   @@index([organizationId, isActive])
   @@index([createdByUserId])
+}
+
+model SavedSearch {
+  id             String   @id @default(cuid())
+  organizationId String
+  userId         String
+  name           String
+  filters        String
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, userId])
 }
