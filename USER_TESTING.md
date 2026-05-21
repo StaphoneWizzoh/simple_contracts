@@ -1,16 +1,89 @@
-# SimpleContracts — User Testing Guide
+# SimpleContracts — Testing Guide
 
-> This document is a phase-by-phase testing checklist for QA, client demos, and internal review.  
+> This document covers both **user testing** (QA, demos, internal review) and **developer testing** (unit/integration tests, test infrastructure).
 > Each section lists the user journey, expected outcomes, and edge cases to verify.
 
 ---
 
 ## How to Use This Guide
 
+### For QA / User Testing
 - Work through each scenario in order — they build on each other.
 - Mark each item `[x]` when confirmed working, `[!]` if a bug is found.
 - Record any bugs with: **what you did → what happened → what you expected**.
 - Reset state between test runs where indicated (see **Reset** notes).
+
+### For Developers / Unit Testing
+- See **Developer Testing & Automated Tests** section below for running and writing tests.
+- All new backend features should have unit/integration tests before merging.
+
+---
+
+## Developer Testing & Automated Tests
+
+### Quick Start
+
+```bash
+# From repo root or packages/backend/
+npm run test:migrate -w packages/backend  # One-time: init test database
+npm test -w packages/backend              # Run all tests
+npm run test:watch -w packages/backend    # Watch mode
+npm run test:coverage -w packages/backend # Coverage report
+```
+
+### Test Infrastructure
+
+The backend uses **Vitest** with a real SQLite test database. Tests verify behavior through public APIs, not implementation details.
+
+**Key files:**
+- `server/tests/setup.ts` — H3 shims, testPrisma instance, auth mocks
+- `server/tests/fixtures.ts` — `createTestFixture()` helper (creates org + user + contract in one call)
+- `server/tests/contractGuards.test.ts` — 13 tests for `requireContractAccess` + `requireApprovalAction`
+- `server/tests/auditLog.test.ts` — 6 tests for `logContractEvent` with typed events
+
+### Adding Tests
+
+**Pattern: Red → Green → Refactor (Vertical Slices)**
+
+```typescript
+// 1. Write one failing test
+it("returns { ctx, contract } when valid", async () => {
+  (auth.api.getSession as any).mockResolvedValue({
+    user: { id: fixture.userId },
+  });
+
+  const event = createMockEvent(fixture.userId);
+  const result = await requireContractAccess(event, fixture.contractId);
+
+  expect(result.ctx.userId).toBe(fixture.userId);
+});
+
+// 2. Write minimal code to pass
+export async function requireContractAccess(event, contractId) {
+  const ctx = await getOrgContext(event);
+  // ... minimal implementation
+}
+
+// 3. Next test, repeat
+```
+
+**Tips:**
+- Use `createTestFixture()` in `beforeEach` — never duplicate seed logic
+- Modify fixture inline if needed; restore state after test (see `contractGuards.test.ts` for examples)
+- Test error paths: throw 401/403/404/422 as appropriate
+- Use real database, not mocks — queries must actually work
+
+### Test Statistics
+
+| Module | Tests | What's Covered |
+|---|---|---|
+| **contractGuards** | 13 | Auth, permissions, contract ownership, approval workflows, SEQUENTIAL validation |
+| **auditLog** | 6 | Event serialization, transaction rollback, event detail structure |
+| **Total** | **19** | Permission logic, event service, workflow validation |
+
+All tests green. No test failures in CI.
+
+---
 
 ---
 
