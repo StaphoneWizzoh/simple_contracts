@@ -19,10 +19,134 @@ export type ContractListItem = {
     id: string;
     title: string;
     status: string;
+    contractType: string;
     counterpartyName: string | null;
+    currencyCode: string;
+    totalValueMinor: number | null;
+    effectiveAt: string | null;
+    expiresAt: string | null;
     versionNumber: number;
     updatedAt: string;
     createdAt: string;
+};
+
+export type ContractQueryParams = {
+    search?: string;
+    status?: string;
+    contractType?: string;
+    counterparty?: string;
+    dateField?: "createdAt" | "effectiveAt" | "expiresAt" | "updatedAt";
+    dateFrom?: string;
+    dateTo?: string;
+    reviewerId?: string;
+    valueMin?: number;
+    valueMax?: number;
+    sortBy?: "updatedAt" | "createdAt" | "expiresAt" | "effectiveAt" | "totalValueMinor" | "title" | "status";
+    sortOrder?: "asc" | "desc";
+    page?: number;
+    limit?: number;
+};
+
+export type ContractListResponse = {
+    contracts: ContractListItem[];
+    pagination: { page: number; limit: number; total: number; totalPages: number };
+};
+
+export type SavedSearch = {
+    id: string;
+    name: string;
+    filters: ContractQueryParams;
+    createdAt: string;
+};
+
+// ---- Report types ----
+
+export type ReportFilters = {
+    dateFrom?: string;
+    dateTo?: string;
+    contractType?: string;
+};
+
+export type SummaryReport = {
+    total: number;
+    byStatus: Record<string, number>;
+    expiringSoon: { days30: number; days60: number; days90: number };
+    value: { totalMinor: number; avgMinor: number; contractsWithValue: number };
+};
+
+export type StatusReport = {
+    current: { status: string; count: number }[];
+    trend: ({ month: string } & Record<string, number>)[];
+};
+
+export type TypeReport = {
+    types: { contractType: string; count: number; totalValueMinor: number }[];
+};
+
+export type ExpiringContract = {
+    id: string;
+    title: string;
+    contractType: string;
+    counterpartyName: string | null;
+    expiresAt: string | null;
+    totalValueMinor: number | null;
+    currencyCode: string;
+    daysUntilExpiry: number | null;
+    ownerUser: { id: string; name: string; email: string } | null;
+};
+
+export type ExpiringReport = {
+    days: number;
+    contracts: ExpiringContract[];
+};
+
+export type TurnaroundReport = {
+    count: number;
+    avgDays: number | null;
+    minDays: number | null;
+    maxDays: number | null;
+};
+
+export type ApprovalTurnaroundReport = TurnaroundReport & {
+    approvedCount: number;
+    rejectedCount: number;
+};
+
+export type CreatorReport = {
+    creators: {
+        userId: string;
+        user: { id: string; name: string; email: string } | null;
+        count: number;
+        totalValueMinor: number;
+    }[];
+};
+
+export type OverdueApprovalContract = {
+    id: string;
+    title: string;
+    status: string;
+    contractType: string;
+    counterpartyName: string | null;
+    updatedAt: string;
+    createdAt: string;
+    staleDays: number;
+    ownerUser: { id: string; name: string; email: string } | null;
+    approvals: { approver: { id: string; name: string; email: string }; order: number }[];
+};
+
+export type OverdueReport = {
+    thresholdDays: number;
+    contracts: OverdueApprovalContract[];
+};
+
+export type ValueSummaryReport = {
+    overall: { totalMinor: number; avgMinor: number; maxMinor: number; minMinor: number; count: number };
+    byStatus: { status: string; totalMinor: number; count: number }[];
+    byType: { contractType: string; totalMinor: number; count: number }[];
+};
+
+export type RenewalPipelineReport = {
+    buckets: { days: number; contracts: ExpiringContract[] }[];
 };
 
 export type ContractDetail = {
