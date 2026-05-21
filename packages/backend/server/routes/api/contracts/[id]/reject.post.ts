@@ -1,26 +1,19 @@
 import { prisma } from "../../../../db";
 import { getOrgContext, PERMISSIONS } from "../../../../utils/permissions";
+import { requireContractAccess } from "../../../../utils/contractGuards";
+import { logContractEvent } from "../../../../utils/auditLog";
 import { assertTransition } from "../../../../utils/contractStatus";
 import type { RejectBody } from "../../../../types/contracts";
 
 export default defineEventHandler(async (event) => {
-    const ctx = await getOrgContext(event);
     const contractId = getRouterParam(event, "id");
 
     if (!contractId) {
         throw createError({ statusCode: 400, statusMessage: "Contract ID required" });
     }
 
+    const { ctx, contract } = await requireContractAccess(event, contractId);
     const body = (await readBody(event)) as RejectBody;
-
-    const contract = await prisma.contract.findFirst({
-        where: { id: contractId, organizationId: ctx.organizationId },
-        include: { approvals: true },
-    });
-
-    if (!contract) {
-        throw createError({ statusCode: 404, statusMessage: "Contract not found" });
-    }
 
     assertTransition(contract.status, "DRAFT");
 
@@ -44,19 +37,18 @@ export default defineEventHandler(async (event) => {
             data: { status: "DRAFT" },
         });
 
-        await tx.contractAuditLog.create({
-            data: {
-                contractId,
-                actorUserId: ctx.userId,
-                eventType: "STATUS_CHANGED",
-                details: JSON.stringify({
-                    from: "REVIEW",
-                    to: "DRAFT",
-                    reason: "rejected",
-                    comment: body.comment ?? null,
-                }),
+        await logContractEvent(
+            {
+                type: "STATUS_CHANGED",
+                transition: "rejected",
+                from: "REVIEW",
+                to: "DRAFT",
+                reason: "rejected",
+                comment: body.comment ?? null,
             },
-        });
+            { contractId, actorUserId: ctx.userId },
+            tx,
+        );
     });
 
     return { success: true, status: "DRAFT" };
