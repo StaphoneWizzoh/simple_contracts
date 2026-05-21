@@ -18,3 +18,4 @@ packages/backend/docs
 .agents
 settings.local.json
 code_review
+.claude/skills/
