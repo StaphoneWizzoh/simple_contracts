@@ -8,7 +8,10 @@
         "preview": "node .output/server/index.mjs",
         "db:migrate": "prisma migrate dev",
         "db:studio": "prisma studio",
-        "docs": "typedoc && typedoc --options typedoc.html.json"
+        "docs": "typedoc && typedoc --options typedoc.html.json",
+        "test:migrate": "cross-env DATABASE_URL=file:./prisma/test.db prisma migrate deploy",
+        "test": "vitest run",
+        "test:watch": "vitest"
     },
     "dependencies": {
         "@prisma/client": "^5.8.0",
@@ -18,10 +21,14 @@
     },
     "devDependencies": {
         "@types/node": "^20.10.6",
+        "@vitest/coverage-v8": "^1.0.0",
+        "cross-env": "^10.1.0",
         "nitropack": "^2.13.3",
         "prisma": "^5.8.0",
         "typedoc": "^0.28.19",
         "typedoc-plugin-markdown": "^4.11.0",
-        "typescript": "^5.3.3"
+        "typescript": "^5.3.3",
+        "vite-tsconfig-paths": "^4.2.0",
+        "vitest": "^1.0.0"
     }
 }

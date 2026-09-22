@@ -30,6 +30,7 @@ Generated API documentation is available for each package. Run `npm run docs` fr
 | **Database ORM** | Prisma 5 |
 | **Database** | SQLite (dev) |
 | **Authentication** | Better Auth 1.6 |
+| **Testing** | Vitest 1.0, @vitest/coverage-v8 |
 | **Monorepo** | npm workspaces |
 
 ---
@@ -129,7 +130,14 @@ npm run dev:backend
 npm run dev:frontend
 ```
 
-### 5. Verify everything is running
+### 5. Set up test database (optional, for development)
+
+```bash
+# One-time setup for running backend tests
+npm run test:migrate -w packages/backend
+```
+
+### 6. Verify everything is running
 
 ```bash
 npm run health
@@ -221,6 +229,46 @@ simple_contracts/
 
 ---
 
+## Testing
+
+The backend uses **Vitest** with a real SQLite test database for integration-style testing. All tests verify behavior through public APIs, not implementation details.
+
+### Running Tests
+
+```bash
+# First time only: initialize test database
+npm run test:migrate -w packages/backend
+
+# Run all tests
+npm test -w packages/backend
+
+# Watch mode (re-runs on file changes)
+npm run test:watch -w packages/backend
+
+# Generate coverage report
+npm run test:coverage -w packages/backend
+```
+
+### Test Coverage
+
+| Module | Tests | Coverage |
+|---|---|---|
+| **contractGuards.ts** | 13 | `requireContractAccess`, `requireApprovalAction` — auth, permissions, contract ownership, approval workflows |
+| **auditLog.ts** | 6 | `logContractEvent` — typed event serialization, transaction rollback semantics |
+| **Total** | **19** | Core permission logic, event service, workflow validation |
+
+### Test Patterns
+
+Tests use:
+- **Fixtures:** `createTestFixture()` helper creates org + role + user + member + contract in one call (no seed duplication)
+- **Real database:** Tests hit a real SQLite instance, not mocks
+- **Typed events:** All audit log entries use discriminated union types (no freeform JSON strings)
+- **TDD vertical slices:** One test → one implementation → repeat (not horizontal batching)
+
+See [memory/testing_patterns.md](packages/backend/server/tests/) for detailed testing patterns and guard design.
+
+---
+
 ## Key Concepts
 
 ### Role-Based Access Control (RBAC)
@@ -241,7 +289,22 @@ Every user belongs to one organisation. Within that org they are assigned an `Or
 
 Four system roles are seeded for every new organisation: **Admin**, **Contract Manager**, **Contract Creator**, **Viewer**.
 
-All API routes are guarded by `getOrgContext(event)` (membership check) or `requirePermission(event, permission)` (permission + membership check).
+All API routes are guarded by `getOrgContext(event)` (membership check) or `requirePermission(event, permission)` (permission + membership check). Contract-specific access is consolidated behind two reusable guards:
+
+- **`requireContractAccess(event, contractId, permission?)`** — Returns pre-loaded `{ ctx, contract }`. Validates auth, org membership, contract ownership, and optional permission. Throws 401/403/404 as appropriate.
+- **`requireApprovalAction(event, contractId)`** — Extends requireContractAccess with approval-specific preconditions: contract must be in REVIEW status, caller must have a PENDING approval, and for SEQUENTIAL workflows all prior approvals must be complete. Used by approve/reject endpoints.
+
+### Audit Logging & Events
+
+Every contract state change writes to `ContractAuditLog` via the typed event service `logContractEvent(event, context, tx?)`. Events are discriminated unions ensuring type-safe details:
+
+- **`CONTRACT_CREATED`** — source (manual/template), mode (blank/duplicate), optional template ID
+- **`APPROVAL_SUBMITTED`** — action (APPROVED/REJECTED), comment
+- **`STATUS_CHANGED`** — transition variant (to_review, rejected, terminated, sent_for_signing, reopen_signing) with variant-specific details
+- **`SIGNATORY_ADDED` / `SIGNATORY_REMOVED`** — party info
+- Plus: `VERSION_CREATED`, `SETTINGS_UPDATED`, `REVIEWERS_ASSIGNED`
+
+The service eliminates 20+ inline `JSON.stringify` calls and untyped `eventType` strings across routes.
 
 ### Contract Lifecycle
 
@@ -447,6 +510,10 @@ Key models and their purpose:
 | `npm run docs` | Generate API docs for all packages |
 | `npm run db:migrate -w packages/backend` | Apply Prisma migrations |
 | `npm run db:studio -w packages/backend` | Open Prisma Studio |
+| `npm run test:migrate -w packages/backend` | Initialize test database (run once, then after schema changes) |
+| `npm test -w packages/backend` | Run all backend tests |
+| `npm run test:watch -w packages/backend` | Run tests in watch mode |
+| `npm run test:coverage -w packages/backend` | Generate test coverage report |
 
 ---
 
